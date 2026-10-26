@@ -117,6 +117,7 @@ export function SettingsScreen() {
                   on ? off.delete(r.id) : off.add(r.id);
                   save({ ...prefs, rooms_off: [...off] });
                 }} />`)}
+            <div class="soft small" style="margin-top:8px">📣 Biri seni @etiketlediğinde ya da mesajına yanıt verdiğinde, oda kapalı olsa bile bildirim gelir.</div>
           </div>
           <${Category} kind="radar" title="🚨 Radar bildirimleri" subtitle="Yeni sabit ya da mobil radar bildirilince" />
         `}

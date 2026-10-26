@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.0.1";
+const VERSION = "dyb-1.1.0";
 
 const SHELL = [
   "./",
@@ -21,6 +21,7 @@ const SHELL = [
   "./js/screens/invites.js",
   "./js/screens/settings.js",
   "./js/screens/admin.js",
+  "./js/screens/profile.js",
   "./vendor/preact-htm.js",
   "./vendor/supabase.js",
   "./vendor/leaflet/leaflet.js",
@@ -80,9 +81,16 @@ self.addEventListener("push", (event) => {
   if (type === "radar") {
     url = d.radar_id ? `./#/harita?radar=${encodeURIComponent(d.radar_id)}` : "./#/harita";
     tag = "radar-" + (d.radar_id || Date.now());
+  } else if (type === "yardim") {
+    url = "./#/davetler";                       // güncelleme yapamayan davetli
+    tag = "yardim";
+  } else if (type === "sifre") {
+    url = "./#/yonetim?tab=sifre";              // şifre yenileme talebi
+    tag = "sifre";
   } else {
+    // Sohbet ve etiket ("mention"): o odayı ve mesajı açar
     const room = d.room || "trafik";
-    url = `./#/oda/${encodeURIComponent(room)}`;
+    url = `./#/oda/${encodeURIComponent(room)}` + (d.message_id ? `?m=${encodeURIComponent(d.message_id)}` : "");
     tag = "oda-" + room;
   }
 

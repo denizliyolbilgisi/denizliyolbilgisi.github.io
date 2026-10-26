@@ -7,7 +7,8 @@ import * as api from "./api.js";
 import { Toaster, Spinner } from "./ui.js";
 import { refreshPush } from "./push.js";
 import { startUsageTracking } from "./usage.js";
-import { LoginScreen, RegisterScreen, UsernameScreen, BannedScreen } from "./screens/auth.js";
+import { LoginScreen, RegisterScreen, UsernameScreen, BannedScreen, NewPasswordScreen } from "./screens/auth.js";
+import { ProfileScreen } from "./screens/profile.js";
 import { MenuScreen } from "./screens/menu.js";
 import { ChatScreen } from "./screens/chat.js";
 import { MapScreen } from "./screens/map.js";
@@ -93,6 +94,7 @@ function App() {
   const [authState, setAuthState] = useState("loading");   // loading | out | in
   const [profile, setProfile] = useState(null);
   const [checked, setChecked] = useState(false);            // yasak / kullanıcı adı kontrolü yapıldı mı
+  const [mustChange, setMustChange] = useState(false);      // geçici şifreyle girildi
 
   // Oturum
   useEffect(() => {
@@ -117,6 +119,7 @@ function App() {
         const p = await api.me();
         if (!alive) return;
         setProfile(p);
+        setMustChange(api.mustChangePassword());
         if (p && p.banned_at && p.role !== "kurucu") navigate("/yasakli", true);
         else if (p && !p.username) navigate("/kullanici-adi", true);
         else refreshPush();
@@ -142,11 +145,13 @@ function App() {
     screen = html`<div class="boot"><div class="badge">DYB</div><${Spinner} /></div>`;
   } else if (profile && profile.banned_at && profile.role !== "kurucu") {
     screen = html`<${BannedScreen} profile=${profile} />`;
+  } else if (mustChange) {
+    screen = html`<${NewPasswordScreen} onDone=${() => { setMustChange(false); navigate("/menu", true); }} />`;
   } else if (profile && !profile.username) {
     screen = html`<${UsernameScreen} onDone=${(name) => { setProfile({ ...profile, username: name }); navigate("/menu", true); }} />`;
   } else if (path.startsWith("/oda/")) {
     const roomId = decodeURIComponent(path.slice(5)) || "trafik";
-    screen = html`<${ChatScreen} key=${roomId} roomId=${roomId} />`;
+    screen = html`<${ChatScreen} key=${roomId} roomId=${roomId} focusId=${parseInt(query.get("m") || "", 10) || null} />`;
   } else if (path === "/harita") {
     screen = html`<${MapScreen} focusRadarId=${query.get("radar")} openReport=${query.get("bildir") === "1"} />`;
   } else if (path === "/davetler") {
@@ -154,7 +159,9 @@ function App() {
   } else if (path === "/ayarlar") {
     screen = html`<${SettingsScreen} />`;
   } else if (path === "/yonetim") {
-    screen = html`<${AdminScreen} />`;
+    screen = html`<${AdminScreen} startTab=${query.get("tab")} />`;
+  } else if (path === "/profil") {
+    screen = html`<${ProfileScreen} />`;
   } else {
     screen = html`<${MenuScreen} onBanned=${(p) => setProfile(p)} />`;
   }

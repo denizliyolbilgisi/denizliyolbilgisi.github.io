@@ -17,8 +17,11 @@ export function InvitesScreen() {
   const [msg, setMsg] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const [, setTick] = useState(0);
+  const [helps, setHelps] = useState([]);         // güncellemesi gereken Android davetliler
+  const [sendingApk, setSendingApk] = useState(null);
 
   async function load() {
+    api.updateHelps().then(setHelps).catch(() => {});
     try {
       const [list, p] = await Promise.all([api.myInviteCodes(), api.me()]);
       setCodes(list || []);
@@ -61,6 +64,34 @@ export function InvitesScreen() {
     }
   }
 
+  /** Son Android sürümünü indirip WhatsApp vb. ile gönderir */
+  async function sendApp(h) {
+    if (sendingApk) return;
+    setSendingApk(h.user_id);
+    try {
+      const apk = await api.latestApk();
+      if (navigator.canShare && navigator.canShare({ files: [apk.file] })) {
+        try {
+          await navigator.share({ files: [apk.file], text: `DYB ${apk.version} – dosyayı açıp "Güncelle"ye bas.` });
+        } catch (_) { /* vazgeçildi */ }
+      } else {
+        // Paylaşma desteklenmiyorsa dosya indirilir
+        const url = URL.createObjectURL(apk.file);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = apk.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        toast("Dosya indirildi. Dosyalar uygulamasından WhatsApp ile gönderebilirsin.", 5000);
+      }
+    } catch (e) {
+      setMsg({ err: true, text: userMessage(e, "Güncelleme dosyası indirilemedi. Biraz sonra tekrar dene.") });
+    }
+    setSendingApk(null);
+  }
+
   async function share(code) {
     const text = "DYB - Denizli Yol Bilgisi'ne davetlisin!\n\n" +
       `Davet kodun: ${code}\n\n` +
@@ -88,6 +119,28 @@ export function InvitesScreen() {
           ${busy ? html`<${Spinner} small />` : !me ? "Yükleniyor…" : nextAllowed ? `Sonraki kod: ${waitText(nextAllowed - Date.now())} sonra` : "＋ Yeni Davet Kodu Oluştur"}
         </button>
         ${msg && html`<div class=${"msg " + (msg.err ? "err" : "ok")}>${msg.text}</div>`}
+        ${helps.length > 0 && html`
+          <div class="card" style="background:#4A2A10;border-color:#FFB020">
+            <div class="bold" style="font-size:19px">🆘 Güncellemesi gerekenler (Android)</div>
+            <div class="small" style="color:#FFE0B2;margin-bottom:6px">"Gönder" ile yeni Android sürümünü WhatsApp'tan gönderebilirsin. Dosyayı açıp "Güncelle"ye basması yeterli.</div>
+            ${helps.slice(0, 6).map((h) => html`
+              <div class="row" key=${h.user_id} style="margin-top:8px">
+                <div class="grow">
+                  <div class="bold" style="font-size:18px">@${h.username || ""}</div>
+                  <div class="small" style="color:#FFE0B2">${h.app_version_name ? "Sürüm " + h.app_version_name : "Eski sürüm"}${h.request_id ? " • yardım istedi" : ""}</div>
+                </div>
+                <button class="btn small" disabled=${!!sendingApk} onClick=${() => sendApp(h)}>${sendingApk === h.user_id ? "İndiriliyor…" : "📤 Gönder"}</button>
+                ${h.request_id && html`<button class="btn small ghost" disabled=${!!sendingApk} onClick=${async () => {
+                  try {
+                    await api.resolveUpdateHelp(h.user_id);
+                    toast("@" + (h.username || "") + " işaretlendi");
+                    load();
+                  } catch (e) {
+                    setMsg({ err: true, text: userMessage(e) });
+                  }
+                }}>✓</button>`}
+              </div>`)}
+          </div>`}
         ${codes === null ? html`<${Spinner} />` : codes.length === 0
           ? html`<div class="center muted" style="padding:30px">Henüz davet kodun yok.<br />Yukarıdaki butonla ilk kodunu oluştur.</div>`
           : codes.map((c) => html`

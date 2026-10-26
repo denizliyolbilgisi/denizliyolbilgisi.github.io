@@ -1,9 +1,10 @@
 // Karşılama menüsü: Harita + sohbet odaları (küçük kartlar), altta kısayollar
-import { html, useState, useEffect, navigate, agoText, remainingText, isStillActive, roleRank, toast, userMessage } from "../lib.js";
+import { html, useState, useEffect, useRef, navigate, agoText, remainingText, isStillActive, roleRank, toast, store } from "../lib.js";
 import * as api from "../api.js";
 import { Modal, useInterval, useOnResume } from "../ui.js";
 import { DENIZLI, FETCH_RADIUS_M } from "../config.js";
-import { enablePush, disablePush, pushConfigured, pushSupported, permission } from "../push.js";
+import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
+import { RankUpModal } from "./profile.js";
 
 const ROOM_COLORS = {
   trafik: ["#FFB020", "#E07B00"],
@@ -42,8 +43,8 @@ export function MenuScreen({ onBanned }) {
   const [openReports, setOpenReports] = useState(0);
   const [announcement, setAnnouncement] = useState({ text: "", warn: false });
   const [tick, setTick] = useState(0);
-  const [logout, setLogout] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [rankUp, setRankUp] = useState(null);   // { icon, name }
+  const lastPoints = useRef(null);
   const [pushPerm, setPushPerm] = useState(permission());
 
   async function refresh() {
@@ -51,6 +52,18 @@ export function MenuScreen({ onBanned }) {
       setMe(p);
       if (p && p.banned_at && p.role !== "kurucu") onBanned(p);
       if (p && roleRank(p.role) >= 2) api.openReportCount().then(setOpenReports).catch(() => {});
+      // Puan değiştiyse rütbe atladı mı bak (kutlama bir kez gösterilir)
+      if (p && p.points !== lastPoints.current) {
+        lastPoints.current = p.points;
+        api.myProfile().then((d) => {
+          const r = d?.rank;
+          if (!r) return;
+          const key = "dyb_rutbe_" + p.id;
+          const seen = store.get(key, 0);
+          if (seen >= 1 && seen < r.level) setRankUp({ icon: r.icon, name: r.name });
+          if (seen !== r.level) store.set(key, r.level);
+        }).catch(() => {});
+      }
     }).catch(() => {});
     api.roomsOverview().then((list) => {
       if (list.length) setRooms(list);
@@ -153,7 +166,7 @@ export function MenuScreen({ onBanned }) {
         ${rank >= 2 && html`<${Tile} icon="🛡" label="Yönetim" color="#7B4DDB" count=${openReports} onClick=${() => navigate("/yonetim")} />`}
         <${Tile} icon="⚙️" label="Ayarlar" color="#00897B" onClick=${() => navigate("/ayarlar")} />
         <${Tile} icon="👥" label="Davetler" color="#1F6FEB" onClick=${() => navigate("/davetler")} />
-        <${Tile} icon="🚪" label="Çıkış" color="#D32F2F" onClick=${() => setLogout(true)} />
+        <${Tile} icon="👤" label="Profil" color="#E0A800" onClick=${() => navigate("/profil")} />
       </div>
 
       ${me?.role_notice && html`
@@ -162,24 +175,6 @@ export function MenuScreen({ onBanned }) {
           <p style="font-size:18px;margin:0">${me.role_notice}</p>
         </${Modal}>`}
 
-      ${logout && html`
-        <${Modal} title="Çıkış Yap" onClose=${() => !busy && setLogout(false)}
-          actions=${[
-            html`<button class="btn outline" disabled=${busy} onClick=${() => setLogout(false)}>Vazgeç</button>`,
-            html`<button class="btn red" disabled=${busy} onClick=${async () => {
-              setBusy(true);
-              try {
-                await disablePush();
-                await api.signOut();
-              } catch (e) {
-                toast(userMessage(e));
-              }
-              setBusy(false);
-              setLogout(false);
-              navigate("/giris", true);
-            }}>${busy ? "Çıkılıyor…" : "Çıkış Yap"}</button>`,
-          ]}>
-          <p style="font-size:18px;margin:0">Hesabından çıkış yapılsın mı? Tekrar girmek için e-posta ve şifren gerekir.</p>
-        </${Modal}>`}
+      ${rankUp && html`<${RankUpModal} icon=${rankUp.icon} name=${rankUp.name} onClose=${() => setRankUp(null)} />`}
     </div>`;
 }

@@ -5,6 +5,7 @@ import {
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, useInterval, useOnResume } from "../ui.js";
+import { MemberProfileModal } from "./profile.js";
 
 const MAX_LENGTH = 500;
 
@@ -33,7 +34,32 @@ function senderLabel(m, adminIds) {
   return badge ? `@${name} ${badge}` : `@${name}`;
 }
 
-export function ChatScreen({ roomId }) {
+/** Mesajdaki @etiketleri mavi ve kalın gösterir */
+function withMentions(text, color) {
+  const parts = [];
+  let last = 0;
+  for (const m of text.matchAll(api.MENTION_RE)) {
+    const start = m.index + m[1].length;
+    parts.push(text.slice(last, start));
+    parts.push(html`<b style=${`color:${color}`}>${text.slice(start, m.index + m[0].length)}</b>`);
+    last = m.index + m[0].length;
+  }
+  parts.push(text.slice(last));
+  return parts;
+}
+
+/** Bu odanın bekleyen bildirimlerini kapatır */
+function clearRoomNotifications(roomId) {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready
+      .then((reg) => reg.getNotifications({ tag: "oda-" + roomId }))
+      .then((list) => list.forEach((n) => n.close()))
+      .catch(() => {});
+  } catch (_) { /* */ }
+}
+
+export function ChatScreen({ roomId, focusId }) {
   const [room, setRoom] = useState(api.cachedRoom(roomId));
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +81,13 @@ export function ChatScreen({ roomId }) {
   const [rules, setRules] = useState(null);           // { text, key }
   const listRef = useRef(null);
   const myId = api.myId();
+  const [profileFor, setProfileFor] = useState(null);   // isme dokununca açılan profil
+  const [candidates, setCandidates] = useState([]);     // @ önerileri
+  const [newCount, setNewCount] = useState(0);          // aşağıdaki okunmamış yeni mesaj
+  const [atBottom, setAtBottom] = useState(true);
+  const [highlight, setHighlight] = useState(null);     // bildirimden gelinen mesaj
+  const atBottomRef = useRef(true);
+  const lastShownRef = useRef(null);
 
   const rank = roleRank(me?.role);
   const myPower = Math.max(room.my_power || 2, rank * 2);
@@ -116,12 +149,52 @@ export function ChatScreen({ roomId }) {
   useInterval(() => { loadRoom(); loadMe(); }, 30000, [roomId]);
   useOnResume(() => { loadMessages(); loadRoom(); });
 
-  // Yeni mesaj gelince en alta in
+  // ---------- Kaydırma ----------
+  // İlk açılışta animasyonsuz en alta (ya da bildirimdeki mesaja) gider.
+  // Sonra: en alttaysan ya da mesajı sen yazdıysan aşağı kayar; eski mesajları okuyorsan
+  // yerinden oynamaz, "⬇ N yeni mesaj" düğmesi çıkar.
   const lastId = messages.length ? messages[messages.length - 1].id : 0;
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el || !lastId) return;
+    const prev = lastShownRef.current;
+    lastShownRef.current = lastId;
+    if (prev === null) {
+      const target = focusId && document.getElementById("m" + focusId);
+      if (target) {
+        target.scrollIntoView({ block: "center" });
+        setHighlight(focusId);
+        setTimeout(() => setHighlight(null), 4000);
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+      return;
+    }
+    const fresh = messages.filter((m) => m.id > prev);
+    if (!fresh.length) return;
+    if (atBottomRef.current || fresh.some((m) => m.user_id === myId)) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      setNewCount(0);
+    } else {
+      setNewCount((n) => n + fresh.length);
+    }
   }, [lastId]);
+
+  function onListScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    atBottomRef.current = bottom;
+    setAtBottom(bottom);
+    if (bottom) setNewCount(0);
+  }
+
+  // @ önerileri ve bu odanın bildirimlerini kapatma
+  useEffect(() => {
+    api.mentionCandidates().then(setCandidates).catch(() => {});
+    clearRoomNotifications(roomId);
+  }, [roomId]);
+  useOnResume(() => clearRoomNotifications(roomId));
 
   // Yazılan taslak saklanır (uygulama kapansa bile)
   useEffect(() => { store.set("dyb_taslak_" + roomId, input); }, [input]);
@@ -142,6 +215,9 @@ export function ChatScreen({ roomId }) {
   async function send() {
     const text = input.trim();
     if ((!text && !picked.length) || sending) return;
+    if (api.mentionsIn(text).filter((x) => x !== "herkes").length > api.MAX_MENTIONS) {
+      return setError(`Bir mesajda en fazla ${api.MAX_MENTIONS} kişi etiketlenebilir.`);
+    }
     setSending(true);
     const uploaded = [];
     try {
@@ -175,6 +251,30 @@ export function ChatScreen({ roomId }) {
       toast(isPinned || !msg ? "Sabitleme kaldırıldı" : "📌 Mesaj sabitlendi");
     } catch (e) {
       setError(userMessage(e));
+    }
+  }
+
+  // ---------- @ önerileri (yazının sonunda "@ah" yazılıyorsa) ----------
+  const myName = (me?.username || "").toLowerCase();
+  const typing = /(?:^|\s)@([A-Za-z0-9_]{0,20})$/.exec(input);
+  let mentionBox = null;
+  if (typing) {
+    const q = typing[1].toLowerCase();
+    const all = [...(rank >= 3 ? [{ username: "herkes", role: null }] : []),
+      ...candidates.filter((c) => c.username !== myName)];
+    const matches = all.filter((c) => c.username.startsWith(q)).slice(0, 5);
+    if (matches.length) {
+      mentionBox = html`
+        <div style="background:var(--card-2);padding:4px 0">
+          ${matches.map((c) => html`
+            <button key=${c.username} class="mention-btn"
+              onClick=${() => {
+                const start = input.length - typing[1].length - 1;
+                setInput((input.slice(0, start) + "@" + c.username + " ").slice(0, MAX_LENGTH));
+              }}>
+              ${c.username === "herkes" ? "📣 @herkes  (odadaki herkese duyuru)" : `@${c.username} ${roleBadge(c.role)}`}
+            </button>`)}
+        </div>`;
     }
   }
 
@@ -215,6 +315,7 @@ export function ChatScreen({ roomId }) {
             </div>`)}
         </div>`}
       ${progress && html`<div class="small" style="padding:4px 16px;color:var(--blue-2)">${progress}</div>`}
+      ${mentionBox}
       <div class="composer">
         <button class="cam" disabled=${sending || picked.length >= api.MAX_PHOTOS} onClick=${() => setPhotoSource(true)}>📷</button>
         <textarea class="input" rows="1" maxlength=${MAX_LENGTH} value=${input}
@@ -244,16 +345,21 @@ export function ChatScreen({ roomId }) {
           <div class="grow"><div class="pl">Sabitlenmiş mesaj</div><div class="pt">${room.pinned_text}</div></div>
         </div>`}
 
-      <div class="messages" ref=${listRef}>
+      <div style="flex:1;position:relative;display:flex;flex-direction:column;min-height:0">
+      <div class="messages" ref=${listRef} onScroll=${onListScroll}>
         ${loading ? html`<${Spinner} />`
           : messages.length === 0 ? html`<div class="center muted" style="flex:1">Henüz mesaj yok. İlk mesajı sen yaz!</div>`
           : messages.map((m) => {
             const mine = m.user_id === myId;
+            const mentionsMe = !mine && (m.mention_all || (myName && api.mentionsIn(m.content).includes(myName)));
             const replied = m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : null;
             return html`
               <div class=${"mwrap" + (mine ? " mine" : "")} id=${"m" + m.id} key=${m.id}>
-                ${!mine && html`<div class="sender">${label(m)}</div>`}
-                <div class="bubble" ...${longPress(() => setMenuFor(m))}>
+                ${!mine && html`<div class="sender" style=${`cursor:pointer;font-weight:700;${mentionsMe ? "color:#FFD54F" : ""}`}
+                  onClick=${() => setProfileFor(m.user_id)}>${label(m)}${mentionsMe ? "  📣" : ""}</div>`}
+                <div class="bubble" ...${longPress(() => setMenuFor(m))}
+                  style=${mentionsMe ? `background:#5A4A12;border:${highlight === m.id ? 3 : 1}px solid #FFD54F`
+                    : highlight === m.id ? "box-shadow:0 0 0 3px #FFD54F" : ""}>
                   ${m.reply_to_id && html`
                     <div class="quote" onClick=${(e) => { e.stopPropagation(); scrollToMessage(m.reply_to_id); }}>
                       <div class="bar"></div>
@@ -263,11 +369,17 @@ export function ChatScreen({ roomId }) {
                       </div>
                     </div>`}
                   <${PhotoAlbum} photos=${m.photos} expired=${m.photos_expired} onOpen=${(i) => setViewer({ msg: m, index: i })} />
-                  ${m.content && m.content.trim() && html`<div class="txt">${m.content}</div>`}
+                  ${m.content && m.content.trim() && html`<div class="txt">${withMentions(m.content, mine || mentionsMe ? "#FFE082" : "#58A6FF")}</div>`}
                   <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${chatTime(m.created_at)}</div>
                 </div>
               </div>`;
           })}
+      </div>
+      ${!loading && messages.length > 0 && !atBottom && html`
+        <button class="btn" style="position:absolute;left:50%;bottom:10px;transform:translateX(-50%);border-radius:24px;box-shadow:0 4px 14px rgba(0,0,0,.4)"
+          onClick=${() => { const el = listRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); setNewCount(0); }}>
+          ${newCount > 0 ? `⬇ ${newCount} yeni mesaj` : "⬇ En alta in"}
+        </button>`}
       </div>
 
       ${error && html`<div class="small" style="color:var(--red-soft);padding:4px 16px">${error}</div>`}
@@ -291,6 +403,8 @@ export function ChatScreen({ roomId }) {
             <button class="list-btn muted" onClick=${close}>Vazgeç</button>
           </${Modal}>`;
       })()}
+
+      ${profileFor && html`<${MemberProfileModal} userId=${profileFor} onClose=${() => setProfileFor(null)} />`}
 
       ${reportFor && html`<${ReportDialog} msg=${reportFor} label=${label(reportFor)} onClose=${() => setReportFor(null)}
           onError=${setError} />`}

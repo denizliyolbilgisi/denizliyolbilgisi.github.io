@@ -70,7 +70,8 @@ const SAFE_PREFIXES = [
   "Üye bulunamadı", "Geçersiz süre", "Geçersiz rol", "Kurucu", "Şikayet", "Kendi mesajını",
   "Bu mesajı zaten", "Mesaj bulunamadı", "Fotoğraf", "En fazla 5 fotoğraf", "Geçersiz fotoğraf",
   "Boş mesaj", "Bu odada susturuldun", "Bu odaya sadece", "Sohbet odası", "Odada en fazla",
-  "Açıklama en fazla",
+  "Açıklama en fazla", "Hakkımda", "Kurucunun şifresi", "Şifre şu an", "Şifre değiştirilemedi",
+  "Oturumun sona erdi", "Güncelleme dosyası", "Bir mesajda en fazla",
 ];
 
 export function userMessage(err, fallback = "İşlem şu an tamamlanamadı. Lütfen tekrar dene.") {
@@ -92,6 +93,9 @@ export function userMessage(err, fallback = "İşlem şu an tamamlanamadı. Lüt
   if (t.includes("rate limit") || t.includes("too many")) return "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.";
   if (t.includes("password") && (t.includes("weak") || t.includes("at least") || t.includes("short"))) {
     return "Şifre yeterince güçlü değil. Daha uzun bir şifre seç.";
+  }
+  if (t.includes("different from the old password") || t.includes("same_password")) {
+    return "Yeni şifre eskisiyle aynı olamaz.";
   }
   if (t.includes("invalid") && t.includes("email")) return "Geçerli bir e-posta adresi gir.";
   if (t.includes("jwt") || t.includes("refresh token")) return "Oturumun sona erdi. Çıkış yapıp tekrar giriş yap.";

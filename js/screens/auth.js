@@ -24,6 +24,7 @@ export function LoginScreen() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [forgot, setForgot] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
@@ -61,7 +62,95 @@ export function LoginScreen() {
         ${err && html`<div class="msg err">${err}</div>`}
         <button class="btn block big" type="submit" disabled=${busy}>${busy ? html`<${Spinner} small />` : "Giriş Yap"}</button>
         <button type="button" class="btn ghost" onClick=${() => navigate("/kayit")}>Davet kodum var – Kayıt ol</button>
+        <button type="button" class="btn ghost" onClick=${() => setForgot(true)}>🔑 Şifremi unuttum</button>
       </form>
+      ${forgot && html`<${ForgotPasswordModal} initialEmail=${email.trim()} onClose=${() => setForgot(false)} />`}
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Şifremi unuttum: talep yönetime gider (cevap her zaman aynı)
+// ---------------------------------------------------------------------------
+function ForgotPasswordModal({ initialEmail, onClose }) {
+  const [email, setEmail] = useState(initialEmail || "");
+  const [username, setUsername] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState(null);
+  async function send() {
+    const mail = email.trim();
+    const name = cleanUsername(username.trim().replace(/^@/, ""));
+    if (!mail.includes("@") || name.length < 3) return setErr("E-posta ve kullanıcı adını doğru yaz.");
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.requestPasswordReset(mail, name);
+      setDone(true);
+    } catch (e) {
+      setErr(userMessage(e));
+    }
+    setBusy(false);
+  }
+  return html`
+    <${Modal} title="🔑 Şifremi unuttum" onClose=${() => !busy && onClose()}
+      actions=${done ? html`<button class="btn" onClick=${onClose}>Tamam</button>` : [
+        html`<button class="btn outline" disabled=${busy} onClick=${onClose}>Vazgeç</button>`,
+        html`<button class="btn" disabled=${busy} onClick=${send}>${busy ? "Gönderiliyor…" : "Gönder"}</button>`,
+      ]}>
+      ${done ? html`
+        <p style="font-size:17px;margin:0;white-space:pre-wrap">✅ Talebin yönetime iletildi.
+
+Bilgiler doğruysa bir yönetici sana geçici şifre verecek. Seni davet eden kişiye ya da bir yöneticiye haber verebilirsin.
+
+Geçici şifreyle giriş yapınca kendi yeni şifreni belirleyeceksin.</p>` : html`
+        <p class="soft" style="margin-top:0">E-posta adresini ve kullanıcı adını yaz. Talebin yönetime gider.</p>
+        <input class="input" type="email" inputmode="email" autocapitalize="none" placeholder="E-posta"
+          value=${email} onInput=${(e) => setEmail(e.target.value)} />
+        <input class="input" autocapitalize="none" placeholder="Kullanıcı adı (@ olmadan)" style="margin-top:8px"
+          value=${username} onInput=${(e) => setUsername(e.target.value)} />
+        ${err && html`<div class="msg err">${err}</div>`}`}
+    </${Modal}>`;
+}
+
+// ---------------------------------------------------------------------------
+// Geçici şifreyle girildi: kendi şifresini belirlemeden devam edilemez
+// ---------------------------------------------------------------------------
+export function NewPasswordScreen({ onDone }) {
+  const [p1, setP1] = useState("");
+  const [p2, setP2] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  async function save() {
+    const problem = p1.length < 8 ? "Şifre en az 8 karakter olmalı." : p1 !== p2 ? "İki şifre aynı değil." : null;
+    if (problem) return setErr(problem);
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.setNewPassword(p1);
+      onDone();
+    } catch (e) {
+      setErr(userMessage(e, "Şifre kaydedilemedi. Lütfen tekrar dene."));
+    }
+    setBusy(false);
+  }
+  return html`
+    <div class="screen gradient">
+      <div class="content" style="max-width:480px;margin:0 auto;width:100%">
+        <div class="center" style="gap:8px;margin-top:calc(var(--safe-top) + 30px)">
+          <div style="font-size:52px">🔑</div>
+          <h1 style="margin:0;font-size:26px">Yeni şifreni belirle</h1>
+          <p class="soft" style="margin:0">Yönetici sana geçici bir şifre verdi. Devam etmek için kendi şifreni belirle. Bu şifreyi kimseyle paylaşma.</p>
+        </div>
+        <input class="input" type=${show ? "text" : "password"} autocomplete="new-password"
+          placeholder="Yeni şifre (en az 8 karakter)" value=${p1} onInput=${(e) => setP1(e.target.value)} />
+        <input class="input" type=${show ? "text" : "password"} autocomplete="new-password"
+          placeholder="Yeni şifre (tekrar)" value=${p2} onInput=${(e) => setP2(e.target.value)} />
+        <button class="btn ghost" onClick=${() => setShow(!show)}>${show ? "🙈 Şifreyi gizle" : "👁 Şifreyi göster"}</button>
+        ${err && html`<div class="msg err">${err}</div>`}
+        <button class="btn block big green" disabled=${busy} onClick=${save}>${busy ? "Kaydediliyor…" : "Kaydet ve devam et"}</button>
+        <button class="btn ghost" disabled=${busy} onClick=${async () => { await disablePush(); await api.signOut(); navigate("/giris", true); }}>Çıkış yap</button>
+      </div>
     </div>`;
 }
 

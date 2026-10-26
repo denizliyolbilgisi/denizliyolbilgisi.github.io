@@ -1,7 +1,7 @@
 // Yönetim: Üyeler (e-posta/süre sadece kurucu+yönetici), Şikayetler, Son İşlemler, oda yöneticisi atama
 import {
   html, useState, useEffect, navigate, userMessage, agoText, dateText, remainingText, isStillActive,
-  roleRank, roleLabel, durationText, parseTime,
+  roleRank, roleLabel, durationText, parseTime, copyText, toast,
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner } from "../ui.js";
@@ -29,9 +29,12 @@ function dayLabel(day) {
   return `${DAYS[dt.getDay()]} ${String(d).padStart(2, "0")}.${String(mo).padStart(2, "0")}`;
 }
 
-export function AdminScreen() {
+export function AdminScreen({ startTab }) {
   const [myRank, setMyRank] = useState(1);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(startTab === "sifre" ? "talep" : "uyeler");
+  const [requestCount, setRequestCount] = useState(0);
+  const [resetTarget, setResetTarget] = useState(null);   // şifre yenileme onayı
+  const [tempPass, setTempPass] = useState(null);         // { name, password }
   const [members, setMembers] = useState(null);
   const [rooms, setRooms] = useState(api.cachedRooms());
   const [openCount, setOpenCount] = useState(0);
@@ -50,8 +53,10 @@ export function AdminScreen() {
     (async () => {
       try {
         const p = await api.me();
-        setMyRank(roleRank(p?.role));
+        const rk = roleRank(p?.role);
+        setMyRank(rk);
         setMembers(await api.adminMembers());
+        if (rk >= 3) api.adminPasswordRequests().then((l) => setRequestCount(l.length)).catch(() => {});
         api.openReportCount().then(setOpenCount).catch(() => {});
         api.roomsOverview().then((l) => l.length && setRooms(l)).catch(() => {});
       } catch (e) {
@@ -69,8 +74,12 @@ export function AdminScreen() {
     }).catch((e) => setInfo({ err: true, text: userMessage(e) })).finally(() => setWorking(false));
   }
 
-  const tabs = ["Üyeler", openCount > 0 ? `Şikayetler (${openCount})` : "Şikayetler"];
-  if (myRank >= 3) tabs.push("Son İşlemler");
+  const tabs = [["uyeler", "Üyeler"], ["sikayet", openCount > 0 ? `Şikayetler (${openCount})` : "Şikayetler"]];
+  if (myRank >= 3) tabs.push(["talep", requestCount > 0 ? `🔑 Talepler (${requestCount})` : "🔑 Talepler"]);
+  if (myRank >= 3) tabs.push(["islem", "Son İşlemler"]);
+  const activeTab = tabs.some(([k]) => k === tab) ? tab : "uyeler";
+  // En yeni Android sürümü: üyelerin kullandığı en yüksek sürüm
+  const latestCode = Math.max(0, ...(members || []).map((m) => m.app_version_code || 0));
 
   // Filtre ve sıralama
   const q = search.trim().replace(/^@/, "").toLowerCase();
@@ -78,33 +87,38 @@ export function AdminScreen() {
     (m.email || "").toLowerCase().includes(q));
   if (sort === 1) list = [...list].sort((a, b) => (b.usage_7d || 0) - (a.usage_7d || 0));
   if (sort === 2) list = [...list].sort((a, b) => (parseTime(b.last_seen_at)?.getTime() || 0) - (parseTime(a.last_seen_at)?.getTime() || 0));
+  if (sort === 3) list = list.filter((m) => m.app_version_code && m.app_version_code < latestCode);
 
   return html`
     <div class="screen">
       <${TopBar} title="🛡 Yönetim" sub=${members ? `${members.length} üye` : ""} onBack=${() => navigate("/menu")}
         right=${html`<button class="btn ghost" onClick=${() => setReload((r) => r + 1)}>Yenile</button>`} />
       <div class="tabs">
-        ${tabs.map((t, i) => html`<button key=${i} class=${tab === i ? "on" : ""} onClick=${() => setTab(i)}>${t}</button>`)}
+        ${tabs.map(([k, t]) => html`<button key=${k} class=${activeTab === k ? "on" : ""} onClick=${() => setTab(k)}>${t}</button>`)}
       </div>
       <div class="content">
         ${info && html`<div class=${"msg " + (info.err ? "err" : "ok")}>${info.text}</div>`}
 
-        ${tab === 1 && html`<${ReportsTab} myRank=${myRank} reload=${reload} onInfo=${setInfo}
+        ${activeTab === "talep" && html`<${PasswordRequestsTab} reload=${reload} onInfo=${setInfo}
+            onChanged=${() => setReload((r) => r + 1)}
+            onReset=${(r) => setResetTarget({ id: r.user_id, username: r.username, role: r.role })} />`}
+
+        ${activeTab === "sikayet" && html`<${ReportsTab} myRank=${myRank} reload=${reload} onInfo=${setInfo}
             onChanged=${() => setReload((r) => r + 1)}
             onMute=${(r) => r.reported_id && setMuteTarget({ member: { id: r.reported_id, username: r.reported_name, role: r.reported_role }, reportId: r.id })} />`}
 
-        ${tab === 2 && html`<${ActivityTab} user=${activityUser} reload=${reload} onClearUser=${() => setActivityUser(null)} onInfo=${setInfo} />`}
+        ${activeTab === "islem" && html`<${ActivityTab} user=${activityUser} reload=${reload} onClearUser=${() => setActivityUser(null)} onInfo=${setInfo} />`}
 
-        ${tab === 0 && html`
+        ${activeTab === "uyeler" && html`
           <input class="input" placeholder=${myRank >= 3 ? "Üye ara (@ad ya da e-posta)" : "Üye ara (@ad)"} value=${search}
             onInput=${(e) => setSearch(e.target.value)} />
           ${myRank >= 3 && html`
             <div class="chips">
-              ${["Rütbe", "⏱ En aktif", "👁 Son görülen"].map((t, i) => html`
+              ${["Rütbe", "⏱ En aktif", "👁 Son görülen", "📲 Eski"].map((t, i) => html`
                 <button key=${i} class=${"chip" + (sort === i ? " on" : "")} onClick=${() => setSort(i)}>${t}</button>`)}
             </div>`}
           ${members === null ? html`<${Spinner} />` : list.length === 0 ? html`<div class="center muted">Üye bulunamadı</div>`
-            : list.map((m) => html`<${MemberCard} key=${m.id} m=${m} showPrivate=${myRank >= 3} onClick=${() => setSelected(m)} />`)}
+            : list.map((m) => html`<${MemberCard} key=${m.id} m=${m} showPrivate=${myRank >= 3} latestCode=${latestCode} onClick=${() => setSelected(m)} />`)}
         `}
       </div>
 
@@ -114,7 +128,7 @@ export function AdminScreen() {
           <div style="white-space:pre-wrap;font-size:16px">${statusText(selected)}</div>
           ${myRank >= 3 && html`<${UsageDetail} userId=${selected.id} />`}
           <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
-            ${myRank >= 3 && html`<button class="btn block" onClick=${() => { setActivityUser(selected); setSelected(null); setTab(2); }}>📋  İşlemlerini Gör</button>`}
+            ${myRank >= 3 && html`<button class="btn block" onClick=${() => { setActivityUser(selected); setSelected(null); setTab("islem"); }}>📋  İşlemlerini Gör</button>`}
             ${myRank <= roleRank(selected.role) ? html`<div class="bold">Bu üyeye işlem yapma yetkin yok.</div>` : html`
               ${isMuted(selected)
                 ? html`<button class="btn block green" disabled=${working} onClick=${() => { const m = selected; setSelected(null); run(`${name(m)} artık yazabilir.`, () => api.adminUnmute(m.id)); }}>🔊  Susturmayı Kaldır</button>`
@@ -122,6 +136,8 @@ export function AdminScreen() {
               ${myRank >= 3 && (isBanned(selected)
                 ? html`<button class="btn block green" disabled=${working} onClick=${() => { const m = selected; setSelected(null); run(`${name(m)} yasağı kaldırıldı.`, () => api.adminUnban(m.id)); }}>✅  Yasağı Kaldır</button>`
                 : html`<button class="btn block red" disabled=${working} onClick=${() => { setBanTarget(selected); setSelected(null); }}>⛔  Yasakla</button>`)}
+              ${myRank >= 3 && roleRank(selected.role) < 4 && html`<button class="btn block teal" disabled=${working}
+                onClick=${() => { setResetTarget(selected); setSelected(null); }}>🔑  Şifreyi Yenile</button>`}
               ${myRank >= 3 && html`
                 <div class="bold" style="margin-top:6px">🔰 Oda yöneticiliği:</div>
                 <div class="muted small">Oda yöneticisi sadece kendi odasında mesaj silebilir, sabitleyebilir, 24 saate kadar susturabilir ve açıklamayı değiştirebilir.</div>
@@ -156,6 +172,44 @@ export function AdminScreen() {
           placeholder="Örn: Spam – kural 5" onClose=${() => setBanTarget(null)}
           onConfirm=${(why) => { const m = banTarget; setBanTarget(null); run(`${name(m)} yasaklandı.`, () => api.adminBan(m.id, why)); }} />`}
 
+      ${resetTarget && html`
+        <${Modal} title="🔑 Şifreyi yenile" onClose=${() => !working && setResetTarget(null)}
+          actions=${[
+            html`<button class="btn outline" disabled=${working} onClick=${() => setResetTarget(null)}>Vazgeç</button>`,
+            html`<button class="btn teal" disabled=${working} onClick=${async () => {
+              const m = resetTarget;
+              setWorking(true);
+              try {
+                const password = await api.adminResetPassword(m.id);
+                setResetTarget(null);
+                setTempPass({ name: name(m), password });
+                setInfo({ err: false, text: `${name(m)} için geçici şifre oluşturuldu.` });
+                setReload((r) => r + 1);
+              } catch (e) {
+                setResetTarget(null);
+                setInfo({ err: true, text: userMessage(e, "Şifre şu an yenilenemedi. Lütfen tekrar dene.") });
+              }
+              setWorking(false);
+            }}>${working ? "Oluşturuluyor…" : "Yenile"}</button>`,
+          ]}>
+          <p style="margin:0;font-size:17px;white-space:pre-wrap">${name(resetTarget)} için geçici bir şifre oluşturulacak.
+
+• Üyenin tüm oturumları kapanır.
+• Geçici şifreyle girince kendi şifresini belirlemek zorunda olur.
+• Geçici şifreyi sadece bir kez göreceksin; üyeye sen ileteceksin.</p>
+        </${Modal}>`}
+
+      ${tempPass && html`
+        <${Modal} title="✅ Geçici şifre hazır" closeOnBackdrop=${false}
+          actions=${[
+            html`<button class="btn" onClick=${async () => toast((await copyText(tempPass.password)) ? "Şifre kopyalandı" : "Kopyalanamadı")}>📋 Kopyala</button>`,
+            html`<button class="btn outline" onClick=${() => setTempPass(null)}>Kapat</button>`,
+          ]}>
+          <div>${tempPass.name} için geçici şifre:</div>
+          <div style="font-size:28px;font-weight:800;color:#FFD54F;text-align:center;background:rgba(0,0,0,.35);border-radius:12px;padding:14px 0;margin:10px 0;user-select:all">${tempPass.password}</div>
+          <div class="soft">Bu şifreyi üyeye güvenli şekilde ilet (yüz yüze, telefon ya da özel mesaj). Pencereyi kapatınca bir daha gösterilmez.</div>
+        </${Modal}>`}
+
       ${roleTarget && html`
         <${Modal} title="Rolü değiştir" onClose=${() => setRoleTarget(null)}
           actions=${[
@@ -178,7 +232,7 @@ function statusText(m) {
   return s;
 }
 
-function MemberCard({ m, showPrivate, onClick }) {
+function MemberCard({ m, showPrivate, latestCode, onClick }) {
   const border = isBanned(m) ? "#D32F2F" : isMuted(m) ? "#E07B00" : "";
   const pill = ROLE_PILL[m.role];
   return html`
@@ -196,7 +250,12 @@ function MemberCard({ m, showPrivate, onClick }) {
       ${showPrivate && html`
         ${m.email && html`<div class="soft small">✉️ ${m.email}</div>`}
         <div class="small" style="color:#9FC5FF">⏱ Bugün ${durationText(m.usage_today)} • 7 gün ${durationText(m.usage_7d)} • Toplam ${durationText(m.usage_total)}</div>
-        <div class="soft small">👁 Son görülme: ${m.last_seen_at ? agoText(m.last_seen_at) : "yok"}</div>`}
+        <div class="soft small">👁 Son görülme: ${m.last_seen_at ? agoText(m.last_seen_at) : "yok"}</div>
+        <div class="small" style=${`color:${m.app_version_code && m.app_version_code >= latestCode ? "var(--soft)" : "#FFC27A"}`}>
+          📲 ${!m.app_version_code ? "Sürüm: bilinmiyor (eski Android ya da iPhone)"
+            : m.app_version_code < latestCode ? `Sürüm: ${m.app_version_name || m.app_version_code} ⚠️ güncel değil`
+            : `Sürüm: ${m.app_version_name || m.app_version_code} ✅`}</div>
+        <div class="soft small">⭐ DYB Puanı: ${m.points ?? 0}</div>`}
       ${isMuted(m) && html`<div class="small bold" style="color:#FFC27A">Kalan: ${remainingText(m.muted_until)} • Sebep: ${m.mute_reason || "-"} • Susturan: ${m.muted_by ? "@" + m.muted_by : "-"}</div>`}
       ${isBanned(m) && html`<div class="small bold" style="color:#FF8A80">Yasak sebebi: ${m.ban_reason || "-"} • Yasaklayan: ${m.banned_by ? "@" + m.banned_by : "-"}</div>`}
     </div>`;
@@ -257,6 +316,42 @@ function ReasonDialog({ title, text, placeholder, button, color, onClose, onConf
 }
 
 // ---------------------------------------------------------------------------
+function PasswordRequestsTab({ reload, onInfo, onChanged, onReset }) {
+  const [items, setItems] = useState(null);
+  const [working, setWorking] = useState(false);
+  useEffect(() => {
+    setItems(null);
+    api.adminPasswordRequests().then(setItems).catch((e) => {
+      onInfo({ err: true, text: "Talepler yüklenemedi: " + userMessage(e) });
+      setItems([]);
+    });
+  }, [reload]);
+  if (items === null) return html`<${Spinner} />`;
+  if (!items.length) return html`<div class="center muted" style="padding:30px">Bekleyen şifre talebi yok 👍</div>`;
+  return html`
+    <div class="soft small">Bu üyeler "Şifremi unuttum" dedi. Kişiyi tanıdığından emin ol, sonra geçici şifre ver.</div>
+    ${items.map((r) => html`
+      <div class="card" key=${r.id} style="border-color:var(--teal)">
+        <div class="bold" style="font-size:20px">🔑 ${r.username ? "@" + r.username : "(ad yok)"} ${{ kurucu: "👑", yonetici: "🛡", moderator: "⭐" }[r.role] || ""}</div>
+        ${r.email && html`<div class="soft small">✉️ ${r.email}</div>`}
+        <div class="soft small">İstek: ${dateText(r.created_at)} • ${agoText(r.created_at)}</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <button class="btn block teal" disabled=${working} onClick=${() => onReset(r)}>🔑 Geçici şifre ver</button>
+          <button class="btn block red" disabled=${working} onClick=${async () => {
+            setWorking(true);
+            try {
+              await api.adminClosePasswordRequest(r.id);
+              onInfo({ err: false, text: "Talep kapatıldı." });
+              onChanged();
+            } catch (e) {
+              onInfo({ err: true, text: userMessage(e) });
+            }
+            setWorking(false);
+          }}>✖ Talebi kapat (işlem yapma)</button>
+        </div>
+      </div>`)}`;
+}
+
 function ReportsTab({ myRank, reload, onInfo, onChanged, onMute }) {
   const [status, setStatus] = useState("acik");
   const [reports, setReports] = useState(null);

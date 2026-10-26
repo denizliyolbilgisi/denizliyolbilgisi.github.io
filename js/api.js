@@ -60,6 +60,39 @@ export async function checkUsername(name) {
   return r === "ok" ? null : r;
 }
 export const setUsername = (name) => rpc("set_username", { p_username: name });
+
+// ---------- Profil, puan ve rütbe ----------
+export const myProfile = () => rpc("my_profile");
+export const publicProfile = (userId) => rpc("public_profile", { p_user: userId });
+export const setBio = (text) => rpc("set_bio", { p_text: text });
+export const leaderboard = async () => (await rpc("leaderboard_month")) || [];
+
+// ---------- Şifre ----------
+/** "Şifremi unuttum": talep yönetime gider (giriş yapmadan; cevap hep aynı) */
+export const requestPasswordReset = (email, username) =>
+  rpc("request_password_reset", { p_email: email, p_username: username });
+
+/** Yönetici geçici şifre verdiyse: önce yeni şifre belirlenmeli */
+export function mustChangePassword() {
+  return cachedSession?.user?.user_metadata?.must_change_password === true;
+}
+
+export async function setNewPassword(password) {
+  check(await sb.auth.updateUser({ password, data: { must_change_password: false } }));
+}
+
+/** Eski şifreyi doğrulayıp yenisini kaydeder */
+export async function changePassword(oldPassword, newPassword) {
+  const email = cachedSession?.user?.email || (await session())?.user?.email;
+  if (!email) throw new Error("Giriş gerekli");
+  const r = await sb.auth.signInWithPassword({ email, password: oldPassword });
+  if (r.error) {
+    const t = String(r.error.message || "").toLowerCase();
+    if (t.includes("fetch") || t.includes("network")) throw r.error;
+    throw new Error("Şifre değiştirilemedi: mevcut şifren hatalı.");
+  }
+  await setNewPassword(newPassword);
+}
 export const ackRoleNotice = () => rpc("ack_role_notice");
 export const checkInvite = (code) => rpc("check_invite", { p_code: code });
 
@@ -133,7 +166,7 @@ export function hasUnread(room, myName) {
 // ---------------------------------------------------------------------------
 // Mesajlar
 // ---------------------------------------------------------------------------
-const MSG_COLUMNS = "id, content, created_at, user_id, reply_to_id, photos, photos_expired, room_id, profiles(username, role)";
+const MSG_COLUMNS = "id, content, created_at, user_id, reply_to_id, photos, photos_expired, room_id, mention_all, profiles(username, role)";
 
 export async function latestMessages(roomId, count = 100) {
   const rows = check(await sb.from("messages").select(MSG_COLUMNS)
@@ -150,6 +183,29 @@ export async function sendMessage(roomId, text, replyToId, photos) {
 
 export async function deleteMessage(id) {
   check(await sb.from("messages").delete().eq("id", id));
+}
+
+// ---------- @etiketleme ----------
+/** "@ahmet_k" gibi etiketler (kullanıcı adı: harf, rakam, alt çizgi) */
+export const MENTION_RE = /(^|[^\w@])@([A-Za-z0-9_]{3,20})/g;
+export const MAX_MENTIONS = 5;
+
+/** Mesajdaki etiketler (küçük harf, tekrarsız; "herkes" dahil) */
+export function mentionsIn(text) {
+  const out = new Set();
+  for (const m of (text || "").matchAll(MENTION_RE)) out.add(m[2].toLowerCase());
+  return [...out];
+}
+
+let candidates = null;
+let candidatesAt = 0;
+/** Etiketlenebilecek üyeler (10 dakikada bir tazelenir) */
+export async function mentionCandidates() {
+  if (!candidates || Date.now() - candidatesAt > 600000) {
+    candidates = (await rpc("mention_candidates")) || [];
+    candidatesAt = Date.now();
+  }
+  return candidates;
 }
 
 export function previewText(m) {
@@ -263,6 +319,28 @@ export const adminBan = (user, reason) => rpc("admin_ban", { p_user: user, p_rea
 export const adminUnban = (user) => rpc("admin_unban", { p_user: user });
 export const adminSetRole = (user, role) => rpc("admin_set_role", { p_user: user, p_role: role });
 export const adminUsageDetail = (user) => rpc("admin_usage_detail", { p_user: user });
+export const adminPasswordRequests = async () => (await rpc("admin_password_requests")) || [];
+export const adminClosePasswordRequest = (id) => rpc("admin_close_password_request", { p_id: id });
+
+/** Geçici şifre üretir (rütbe kontrolü sunucudaki dyb-sifre fonksiyonunda) */
+export async function adminResetPassword(userId) {
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/dyb-sifre`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken()}`, apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId }),
+    });
+  } catch (e) {
+    throw e;
+  }
+  let j = {};
+  try {
+    j = await res.json();
+  } catch (_) { /* */ }
+  if (j.password) return j.password;
+  throw new Error(j.error || "Şifre şu an yenilenemedi. Lütfen tekrar dene.");
+}
 
 // ---------------------------------------------------------------------------
 // Radarlar
@@ -308,6 +386,25 @@ export async function myInviteCodes() {
     .eq("created_by", myId()).order("created_at", { ascending: false }));
 }
 export const createInvite = () => rpc("create_invite");
+
+// ---------- Güncellemesi gereken davetliler (Android) ----------
+export const updateHelps = async () => (await rpc("my_update_helps")) || [];
+export const resolveUpdateHelp = (userId) => rpc("resolve_update_help", { p_user: userId });
+
+/** Son Android sürümünü (APK) indirir; paylaşma ya da kaydetme için dosya döner */
+export async function latestApk() {
+  const rows = check(await sb.from("app_releases").select("version_code, version_name, apk_path")
+    .order("version_code", { ascending: false }).limit(1));
+  const r = rows && rows[0];
+  if (!r) throw new Error("Güncelleme dosyası bulunamadı.");
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/app-releases/${r.apk_path}`, {
+    headers: { Authorization: `Bearer ${accessToken()}`, apikey: SUPABASE_KEY },
+  });
+  if (!res.ok) throw new Error("Güncelleme dosyası indirilemedi. Biraz sonra tekrar dene.");
+  const blob = await res.blob();
+  return { name: r.apk_path, version: r.version_name,
+    file: new File([blob], r.apk_path, { type: "application/vnd.android.package-archive" }) };
+}
 export async function deleteInvite(code) {
   check(await sb.from("invite_codes").delete().eq("code", code));
 }
