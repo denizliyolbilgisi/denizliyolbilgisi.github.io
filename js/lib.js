@@ -71,7 +71,8 @@ const SAFE_PREFIXES = [
   "Bu mesajı zaten", "Mesaj bulunamadı", "Fotoğraf", "En fazla 5 fotoğraf", "Geçersiz fotoğraf",
   "Boş mesaj", "Bu odada susturuldun", "Bu odaya sadece", "Sohbet odası", "Odada en fazla",
   "Açıklama en fazla", "Hakkımda", "Kurucunun şifresi", "Şifre şu an", "Şifre değiştirilemedi",
-  "Oturumun sona erdi", "Güncelleme dosyası", "Bir mesajda en fazla",
+  "Oturumun sona erdi", "Güncelleme dosyası", "Bir mesajda en fazla", "Mesaj sadece", "Mesaj en fazla",
+  "Geçersiz tepki",
 ];
 
 export function userMessage(err, fallback = "İşlem şu an tamamlanamadı. Lütfen tekrar dene.") {

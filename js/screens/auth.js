@@ -234,7 +234,7 @@ export function RegisterScreen() {
           <div class="input-wrap"><span class="prefix">@</span>
             <input class=${"input with-prefix" + (errors.username ? " err" : "")} autocapitalize="none" autocorrect="off"
                    value=${username} onInput=${(e) => { const v = cleanUsername(e.target.value); e.target.value = v; setUsername(v); }} />
-          </div>`, `${USERNAME_MIN}-${USERNAME_MAX} karakter: a-z, 0-9 ve _ • Sonradan değiştirilemez`)}
+          </div>`, `${USERNAME_MIN}-${USERNAME_MAX} karakter: a-z, 0-9 ve _`)}
         ${f("email", "E-posta", html`<input class=${"input" + (errors.email ? " err" : "")} type="email" autocomplete="email"
             autocapitalize="none" value=${email} onInput=${(e) => setEmail(e.target.value)} />`, "Diğer üyelere gösterilmez")}
         ${f("password", "Şifre", html`<input class=${"input" + (errors.password ? " err" : "")} type="password"
@@ -252,7 +252,7 @@ export function RegisterScreen() {
             html`<button class="btn" onClick=${register}>Evet, kayıt ol</button>`,
           ]}>
           <p style="font-size:19px;margin:0">Kullanıcı adın <b>@${username}</b> olacak.</p>
-          <p class="soft">Kullanıcı adı sonradan <b>değiştirilemez</b>. Sohbette herkes seni bu adla görür.</p>
+          <p class="soft">Sohbette herkes seni bu adla görür. Sonradan Profil'den 7 günde bir değiştirebilirsin.</p>
         </${Modal}>`}
     </div>`;
 }
@@ -287,7 +287,7 @@ export function UsernameScreen({ onDone }) {
       <form class="content" style="max-width:480px;margin:0 auto;width:100%"
             onSubmit=${(e) => { e.preventDefault(); const le = usernameLocalError(name); le ? setErr(le) : setConfirm(true); }}>
         <${Logo} sub="Kullanıcı adını seç" />
-        <p class="soft" style="margin:0">Sohbette e-postan yerine kullanıcı adın görünür. Bir kez seçilir, sonradan değiştirilemez.</p>
+        <p class="soft" style="margin:0">Sohbette e-postan yerine kullanıcı adın görünür. Sonradan Profil'den 7 günde bir değiştirebilirsin.</p>
         <div class="field">
           <label>Kullanıcı Adı</label>
           <div class="input-wrap"><span class="prefix">@</span>
@@ -305,7 +305,7 @@ export function UsernameScreen({ onDone }) {
             html`<button class="btn outline" onClick=${() => setConfirm(false)}>Düzelt</button>`,
             html`<button class="btn" onClick=${save}>Evet, kaydet</button>`,
           ]}>
-          <p style="font-size:19px;margin:0">Kullanıcı adın <b>@${name}</b> olacak. Sonradan değiştirilemez.</p>
+          <p style="font-size:19px;margin:0">Kullanıcı adın <b>@${name}</b> olacak.</p>
         </${Modal}>`}
     </div>`;
 }

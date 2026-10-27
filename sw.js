@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.1.0";
+const VERSION = "dyb-1.1.1";
 
 const SHELL = [
   "./",

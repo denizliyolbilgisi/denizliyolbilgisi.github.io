@@ -1,5 +1,7 @@
 // Profilim, üye profili, ayın ilk 10'u, şifre değiştir, rütbe kutlaması
-import { html, useState, useEffect, navigate, userMessage, dateText, roleBadge, roleLabel, toast } from "../lib.js";
+import {
+  html, useState, useEffect, navigate, userMessage, dateText, roleBadge, roleLabel, toast, cleanUsername, usernameLocalError,
+} from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner } from "../ui.js";
 import { disablePush } from "../push.js";
@@ -111,6 +113,7 @@ export function ProfileScreen() {
             ${invited.length > 0 && html`<div class="soft small" style="margin-top:6px">${invited.map((x) => "@" + x).join("  ")}</div>`}
           </div>
 
+          <button class="btn block big" onClick=${() => setModal("rename")}>✏️ Kullanıcı adını değiştir</button>
           <button class="btn block big teal" onClick=${() => setModal("password")}>🔑 Şifremi değiştir</button>
           <button class="btn block big red" onClick=${() => setModal("logout")}>🚪 Çıkış yap</button>
         `}
@@ -120,6 +123,9 @@ export function ProfileScreen() {
           onSaved=${(t) => { setP({ ...p, bio: t || null }); setModal(null); toast("Kaydedildi"); }} />`}
       ${modal === "password" && html`<${ChangePasswordModal} onClose=${() => setModal(null)}
           onDone=${() => { setModal(null); toast("✅ Şifren değiştirildi", 4000); }} />`}
+      ${modal === "rename" && html`<${RenameModal} current=${p?.username || ""} nextChange=${p?.username_next_change}
+          onClose=${() => setModal(null)}
+          onDone=${(n) => { setModal(null); setReload((x) => x + 1); toast("✅ Yeni kullanıcı adın: @" + n, 4000); }} />`}
       ${modal === "leaders" && html`<${LeaderboardModal} onClose=${() => setModal(null)} />`}
       ${modal === "rules" && html`<${PointRulesModal} onClose=${() => setModal(null)} />`}
       ${modal === "logout" && html`
@@ -166,6 +172,40 @@ function BioModal({ initial, onClose, onSaved }) {
       <textarea class="input" rows="3" maxlength="100" value=${text}
         onInput=${(e) => setText(e.target.value.replace(/\n/g, " "))}></textarea>
       <div class="muted small">${text.length}/100 • Örnek: Servis şoförüyüm, her sabah Çamlık – Merkez arasındayım.</div>
+      ${err && html`<div class="msg err">${err}</div>`}
+    </${Modal}>`;
+}
+
+/** Kullanıcı adını değiştir: ilk değişiklik serbest, sonra 7 günde bir (sunucu kontrol eder) */
+function RenameModal({ current, nextChange, onClose, onDone }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const wait = nextChange && new Date(nextChange).getTime() > Date.now() ? new Date(nextChange) : null;
+  const pad = (n) => String(n).padStart(2, "0");
+  return html`
+    <${Modal} title="✏️ Kullanıcı adını değiştir" onClose=${() => !busy && onClose()}
+      actions=${wait ? html`<button class="btn" onClick=${onClose}>Tamam</button>` : [
+        html`<button class="btn outline" disabled=${busy} onClick=${onClose}>Vazgeç</button>`,
+        html`<button class="btn" disabled=${busy || !text} onClick=${async () => {
+          const local = usernameLocalError(text);
+          if (local) return setErr(local);
+          setBusy(true);
+          setErr(null);
+          try {
+            onDone(await api.changeUsername(text));
+          } catch (e) {
+            setErr(userMessage(e));
+          }
+          setBusy(false);
+        }}>${busy ? "Kaydediliyor…" : "Kaydet"}</button>`,
+      ]}>
+      <div style="font-size:17px">Şu anki adın: <b>@${current}</b></div>
+      ${wait ? html`<div style="color:#FFD54F;margin-top:8px">Kullanıcı adını 7 günde bir değiştirebilirsin.<br />
+          Sonraki hak: ${pad(wait.getDate())}.${pad(wait.getMonth() + 1)}.${wait.getFullYear()} ${pad(wait.getHours())}:${pad(wait.getMinutes())}</div>` : html`
+        <input class="input" autocapitalize="none" placeholder="Yeni kullanıcı adı" style="margin-top:8px"
+          value=${text} onInput=${(e) => setText(cleanUsername(e.target.value.replace(/^@/, "")))} />
+        <div class="muted small" style="margin-top:6px">3–20 karakter; harf, rakam ve _ kullanılabilir. Değiştirdikten sonra 7 gün yeniden değiştiremezsin. Eski adın 30 gün boyunca başkasına verilmez.</div>`}
       ${err && html`<div class="msg err">${err}</div>`}
     </${Modal}>`;
 }

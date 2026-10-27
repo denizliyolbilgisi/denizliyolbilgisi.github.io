@@ -65,6 +65,8 @@ export const setUsername = (name) => rpc("set_username", { p_username: name });
 export const myProfile = () => rpc("my_profile");
 export const publicProfile = (userId) => rpc("public_profile", { p_user: userId });
 export const setBio = (text) => rpc("set_bio", { p_text: text });
+/** Kullanıcı adını değiştir (ilk değişiklik serbest, sonra 7 günde bir) */
+export const changeUsername = (name) => rpc("change_my_username", { p_new: name });
 export const leaderboard = async () => (await rpc("leaderboard_month")) || [];
 
 // ---------- Şifre ----------
@@ -166,7 +168,8 @@ export function hasUnread(room, myName) {
 // ---------------------------------------------------------------------------
 // Mesajlar
 // ---------------------------------------------------------------------------
-const MSG_COLUMNS = "id, content, created_at, user_id, reply_to_id, photos, photos_expired, room_id, mention_all, profiles(username, role)";
+const MSG_COLUMNS = "id, content, created_at, user_id, reply_to_id, photos, photos_expired, room_id, mention_all, edited_at, " +
+  "profiles(username, role), message_reactions(emoji, user_id)";
 
 export async function latestMessages(roomId, count = 100) {
   const rows = check(await sb.from("messages").select(MSG_COLUMNS)
@@ -180,6 +183,28 @@ export async function sendMessage(roomId, text, replyToId, photos) {
   if (photos && photos.length) row.photos = photos;
   check(await sb.from("messages").insert(row));
 }
+
+// ---------- Düzenleme ve tepki ----------
+export const REACTIONS = ["👍", "✅", "❌", "🙏", "😂", "⚠️"];
+export const EDIT_MINUTES = 15;
+
+/** Kendi mesajı ve ilk 15 dakika içinde mi? */
+export function editable(m, uid) {
+  if (!uid || m.user_id !== uid) return false;
+  const t = new Date(m.created_at).getTime();
+  return !isNaN(t) && Date.now() - t < EDIT_MINUTES * 60000;
+}
+export const editMessage = (id, text) => rpc("edit_message", { p_id: id, p_content: text });
+export const reactMessage = (id, emoji) => rpc("react_message", { p_id: id, p_emoji: emoji });
+export const messageReactors = async (id) => (await rpc("message_reactors", { p_id: id })) || [];
+export const messageEditHistory = async (id) => (await rpc("message_edit_history", { p_id: id })) || [];
+
+/** Tepki sayıları sabit sırayla: [["👍", 3], ...] */
+export function reactionCounts(m) {
+  const list = m.message_reactions || [];
+  return REACTIONS.map((e) => [e, list.filter((r) => r.emoji === e).length]).filter(([, n]) => n > 0);
+}
+export const myReaction = (m, uid) => (m.message_reactions || []).find((r) => r.user_id === uid)?.emoji || null;
 
 export async function deleteMessage(id) {
   check(await sb.from("messages").delete().eq("id", id));

@@ -47,9 +47,25 @@ export function MenuScreen({ onBanned }) {
   const lastPoints = useRef(null);
   const [pushPerm, setPushPerm] = useState(permission());
 
+  // Son bilinen rütbe saklanır: bağlantı koparsa Yönetim düğmesi kaybolmaz
+  const roleKey = "dyb_son_rutbe_" + (api.myId() || "");
+  const [knownRank, setKnownRank] = useState(() => store.get(roleKey, 1));
+  const retry = useRef(0);
+
   async function refresh() {
     api.me().then((p) => {
+      if (!p) {
+        // Oturum henüz hazır değil: eski bilgi kalsın, 5 sn sonra tekrar sor
+        if (retry.current++ < 6) setTimeout(refresh, 5000);
+        return;
+      }
+      retry.current = 0;
       setMe(p);
+      const rk = roleRank(p.role);
+      if (rk !== knownRank) {
+        setKnownRank(rk);
+        store.set(roleKey, rk);
+      }
       if (p && p.banned_at && p.role !== "kurucu") onBanned(p);
       if (p && roleRank(p.role) >= 2) api.openReportCount().then(setOpenReports).catch(() => {});
       // Puan değiştiyse rütbe atladı mı bak (kutlama bir kez gösterilir)
@@ -64,7 +80,9 @@ export function MenuScreen({ onBanned }) {
           if (seen !== r.level) store.set(key, r.level);
         }).catch(() => {});
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (retry.current++ < 6) setTimeout(refresh, 5000);
+    });
     api.roomsOverview().then((list) => {
       if (list.length) setRooms(list);
       setRoomsLoaded(true);
@@ -103,7 +121,7 @@ export function MenuScreen({ onBanned }) {
   const roomStatus = (r) => r.last_at ? "Son mesaj: " + agoText(r.last_at)
     : roomsLoaded ? "Henüz mesaj yok" : chatError ? "Mesaj bilgisi alınamadı" : "Yükleniyor…";
 
-  const rank = roleRank(me?.role);
+  const rank = me ? roleRank(me.role) : knownRank;
   const muted = me && me.role !== "kurucu" && isStillActive(me.muted_until);
   const showPushBanner = pushConfigured() && pushSupported() && pushPerm === "default";
 
@@ -162,12 +180,15 @@ export function MenuScreen({ onBanned }) {
         </div>`}
 
       <div style="flex:1"></div>
-      <div class="tiles">
-        ${rank >= 2 && html`<${Tile} icon="🛡" label="Yönetim" color="#7B4DDB" count=${openReports} onClick=${() => navigate("/yonetim")} />`}
-        <${Tile} icon="⚙️" label="Ayarlar" color="#00897B" onClick=${() => navigate("/ayarlar")} />
-        <${Tile} icon="👥" label="Davetler" color="#1F6FEB" onClick=${() => navigate("/davetler")} />
-        <${Tile} icon="👤" label="Profil" color="#E0A800" onClick=${() => navigate("/profil")} />
-      </div>
+      <div style="height:84px"></div>
+      <nav class="bottom-nav">
+        <button class="on"><span class="i">🏠</span>Ana Sayfa</button>
+        <button onClick=${() => navigate("/davetler")}><span class="i">👥</span>Davetler</button>
+        ${rank >= 2 && html`<button onClick=${() => navigate("/yonetim")}><span class="i">🛡</span>Yönetim
+          ${openReports > 0 && html`<span class="count">${openReports > 9 ? "9+" : openReports}</span>`}</button>`}
+        <button onClick=${() => navigate("/ayarlar")}><span class="i">⚙️</span>Ayarlar</button>
+        <button onClick=${() => navigate("/profil")}><span class="i">👤</span>Profil</button>
+      </nav>
 
       ${me?.role_notice && html`
         <${Modal} title="Yetkin değişti" closeOnBackdrop=${false}

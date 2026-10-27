@@ -1,6 +1,6 @@
 // Sohbet odası: mesajlar, yanıt, fotoğraf albümü, şikayet, sabit mesaj, oda yöneticisi araçları
 import {
-  html, useState, useEffect, useRef, navigate, userMessage, chatTime, remainingText, isStillActive,
+  html, useState, useEffect, useRef, useLayoutEffect, navigate, userMessage, chatTime, remainingText, isStillActive,
   roleRank, roleBadge, toast, copyText, store,
 } from "../lib.js";
 import * as api from "../api.js";
@@ -69,6 +69,9 @@ export function ChatScreen({ roomId, focusId }) {
   const [progress, setProgress] = useState(null);
   const [picked, setPicked] = useState([]);           // { file, url }
   const [replyTo, setReplyTo] = useState(null);
+  const [editing, setEditing] = useState(null);         // düzenlenen mesaj
+  const [reactorsFor, setReactorsFor] = useState(null); // tepki listesi
+  const [historyFor, setHistoryFor] = useState(null);   // düzenleme geçmişi
   const [menuFor, setMenuFor] = useState(null);
   const [reportFor, setReportFor] = useState(null);
   const [deleteFor, setDeleteFor] = useState(null);
@@ -214,11 +217,26 @@ export function ChatScreen({ roomId, focusId }) {
 
   async function send() {
     const text = input.trim();
-    if ((!text && !picked.length) || sending) return;
+    const editPhotos = editing?.photos?.length || 0;
+    if ((!text && !picked.length && !editPhotos) || sending) return;
     if (api.mentionsIn(text).filter((x) => x !== "herkes").length > api.MAX_MENTIONS) {
       return setError(`Bir mesajda en fazla ${api.MAX_MENTIONS} kişi etiketlenebilir.`);
     }
     setSending(true);
+    if (editing) {
+      try {
+        await api.editMessage(editing.id, text);
+        setEditing(null);
+        setInput("");
+        setError(null);
+        await loadMessages();
+      } catch (e) {
+        setError(userMessage(e));
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     const uploaded = [];
     try {
       for (let i = 0; i < picked.length; i++) {
@@ -240,6 +258,15 @@ export function ChatScreen({ roomId, focusId }) {
     } finally {
       setSending(false);
       setProgress(null);
+    }
+  }
+
+  async function react(m, emoji) {
+    try {
+      await api.reactMessage(m.id, emoji);
+      await loadMessages();
+    } catch (e) {
+      setError(userMessage(e));
     }
   }
 
@@ -297,6 +324,15 @@ export function ChatScreen({ roomId, focusId }) {
     bottom = html`<div class="notice" style="background:var(--card-2)">📢 Bu odaya sadece yöneticiler yazabilir.</div>`;
   } else {
     bottom = html`
+      ${editing && html`
+        <div class="replybar" style="background:#3A3410">
+          <div class="bar" style="background:#FFD54F"></div>
+          <div class="grow">
+            <div class="small bold" style="color:#FFD54F">✏️ Mesajını düzenliyorsun</div>
+            <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${api.previewText(editing)}</div>
+          </div>
+          <button class="btn ghost" onClick=${() => { setEditing(null); setInput(""); }}>✕</button>
+        </div>`}
       ${replyTo && html`
         <div class="replybar">
           <div class="bar"></div>
@@ -317,16 +353,16 @@ export function ChatScreen({ roomId, focusId }) {
       ${progress && html`<div class="small" style="padding:4px 16px;color:var(--blue-2)">${progress}</div>`}
       ${mentionBox}
       <div class="composer">
-        <button class="cam" disabled=${sending || picked.length >= api.MAX_PHOTOS} onClick=${() => setPhotoSource(true)}>📷</button>
+        <button class="cam" disabled=${sending || !!editing || picked.length >= api.MAX_PHOTOS} onClick=${() => setPhotoSource(true)}>📷</button>
         <textarea class="input" rows="1" maxlength=${MAX_LENGTH} value=${input}
-          placeholder=${picked.length ? "Açıklama ekle (isteğe bağlı)" : replyTo ? "Yanıtını yaz..." : "Mesaj yaz..."}
+          placeholder=${editing ? "Mesajını düzelt..." : picked.length ? "Açıklama ekle (isteğe bağlı)" : replyTo ? "Yanıtını yaz..." : "Mesaj yaz..."}
           onInput=${(e) => {
             setInput(e.target.value);
             e.target.style.height = "auto";
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
           }}></textarea>
-        <button class="btn" disabled=${sending || (!input.trim() && !picked.length)} onClick=${send}>
-          ${sending ? html`<${Spinner} small />` : "Gönder"}
+        <button class="btn" disabled=${sending || (!input.trim() && !picked.length && !(editing?.photos?.length))} onClick=${send}>
+          ${sending ? html`<${Spinner} small />` : editing ? "Kaydet" : "Gönder"}
         </button>
       </div>`;
   }
@@ -369,9 +405,14 @@ export function ChatScreen({ roomId, focusId }) {
                       </div>
                     </div>`}
                   <${PhotoAlbum} photos=${m.photos} expired=${m.photos_expired} onOpen=${(i) => setViewer({ msg: m, index: i })} />
-                  ${m.content && m.content.trim() && html`<div class="txt">${withMentions(m.content, mine || mentionsMe ? "#FFE082" : "#58A6FF")}</div>`}
-                  <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${chatTime(m.created_at)}</div>
+                  ${m.content && m.content.trim() && html`<${ClampText} text=${m.content} color=${mine || mentionsMe ? "#FFE082" : "#58A6FF"} />`}
+                  <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${m.edited_at ? "düzenlendi • " : ""}${chatTime(m.created_at)}</div>
                 </div>
+                ${api.reactionCounts(m).length > 0 && html`
+                  <button class="reacts" style=${api.myReaction(m, myId) ? "border-color:#3D8BFF" : ""}
+                    onClick=${() => setReactorsFor(m)}>
+                    ${api.reactionCounts(m).map(([e, n]) => html`<span key=${e}>${e}${n > 1 ? " " + n : ""}</span>`)}
+                  </button>`}
               </div>`;
           })}
       </div>
@@ -393,7 +434,14 @@ export function ChatScreen({ roomId, focusId }) {
         return html`
           <${Modal} title=${label(m)} center=${false} onClose=${close}>
             <div class="muted" style="margin-bottom:6px;max-height:4.5em;overflow:hidden">${api.previewText(m)}</div>
-            <button class="list-btn" onClick=${() => { setReplyTo(m); close(); }}>↩  Yanıtla</button>
+            <div class="emoji-row">
+              ${api.REACTIONS.map((e) => html`
+                <button key=${e} class=${api.myReaction(m, myId) === e ? "on" : ""} onClick=${() => { close(); react(m, e); }}>${e}</button>`)}
+            </div>
+            <button class="list-btn" onClick=${() => { setReplyTo(m); setEditing(null); close(); }}>↩  Yanıtla</button>
+            ${api.editable(m, myId) && !(room.read_only && !canModerate) && html`<button class="list-btn"
+              onClick=${() => { setEditing(m); setReplyTo(null); setPicked([]); setInput(m.content || ""); close(); }}>✏️  Düzenle</button>`}
+            ${m.edited_at && rank >= 2 && html`<button class="list-btn" onClick=${() => { setHistoryFor(m); close(); }}>📝  Düzenleme geçmişi</button>`}
             ${m.content && m.content.trim() && html`<button class="list-btn" onClick=${async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); }}>📋  Kopyala</button>`}
             ${m.photos && m.photos.length > 0 && !m.photos_expired && html`<button class="list-btn" onClick=${() => { setViewer({ msg: m, index: 0 }); close(); }}>🖼  Fotoğrafları aç</button>`}
             ${m.user_id !== myId && html`<button class="list-btn" style="color:#FFB020" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet Et</button>`}
@@ -403,6 +451,10 @@ export function ChatScreen({ roomId, focusId }) {
             <button class="list-btn muted" onClick=${close}>Vazgeç</button>
           </${Modal}>`;
       })()}
+
+      ${reactorsFor && html`<${ReactorsModal} msg=${reactorsFor} myId=${myId} onClose=${() => setReactorsFor(null)}
+          onRemove=${(e) => { const m = reactorsFor; setReactorsFor(null); react(m, e); }} />`}
+      ${historyFor && html`<${EditHistoryModal} msg=${historyFor} onClose=${() => setHistoryFor(null)} />`}
 
       ${profileFor && html`<${MemberProfileModal} userId=${profileFor} onClose=${() => setProfileFor(null)} />`}
 
@@ -490,6 +542,60 @@ export function ChatScreen({ roomId, focusId }) {
           <div style="white-space:pre-wrap;font-size:16px">${rules.text}</div>
         </${Modal}>`}
     </div>`;
+}
+
+/** Uzun mesaj 5 satırdan sonra kesilir: "Devamını gör" */
+function ClampText({ text, color }) {
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [overflow, setOverflow] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !open) setOverflow(el.scrollHeight > el.clientHeight + 2);
+  }, [text, open]);
+  return html`
+    <div class=${"txt" + (open ? "" : " clamp")} ref=${ref}>${withMentions(text, color)}</div>
+    ${(overflow || open) && html`<button class="more" style=${`color:${color}`}
+      onClick=${(e) => { e.stopPropagation(); setOpen(!open); }}>${open ? "Daha az göster ▲" : "Devamını gör ▼"}</button>`}`;
+}
+
+/** Tepki bırakanlar */
+function ReactorsModal({ msg, myId, onClose, onRemove }) {
+  const [list, setList] = useState(null);
+  useEffect(() => { api.messageReactors(msg.id).then(setList).catch(() => setList([])); }, [msg.id]);
+  const mine = api.myReaction(msg, myId);
+  return html`
+    <${Modal} title="Tepkiler" onClose=${onClose}
+      actions=${[
+        mine && html`<button class="btn outline" style="color:var(--red-soft)" onClick=${() => onRemove(mine)}>Tepkimi geri al</button>`,
+        html`<button class="btn" onClick=${onClose}>Kapat</button>`,
+      ]}>
+      ${!list ? html`<${Spinner} />` : list.length === 0 ? html`<div class="soft">Henüz tepki yok</div>`
+        : list.map((r) => html`
+          <div class="row" key=${r.user_id} style="padding:6px 0">
+            <span style="font-size:22px;width:40px">${r.emoji}</span>
+            <span style="font-size:17px">${r.username ? "@" + r.username : "Üye"} ${roleBadge(r.role)}${r.user_id === myId ? "  (sen)" : ""}</span>
+          </div>`)}
+    </${Modal}>`;
+}
+
+/** Düzenlemeden önceki haller (moderatör ve üstü) */
+function EditHistoryModal({ msg, onClose }) {
+  const [list, setList] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => { api.messageEditHistory(msg.id).then(setList).catch((e) => setErr(userMessage(e))); }, [msg.id]);
+  return html`
+    <${Modal} title="📝 Düzenleme geçmişi" onClose=${onClose}
+      actions=${html`<button class="btn" onClick=${onClose}>Kapat</button>`}>
+      <div class="bold">Şimdiki hali:</div>
+      <div style="white-space:pre-wrap;margin-bottom:10px">${msg.content}</div>
+      ${err ? html`<div class="msg err">${err}</div>` : !list ? html`<${Spinner} />`
+        : [...list].reverse().map((h, i) => html`
+          <div key=${i} style="margin-top:8px">
+            <div class="bold">Önceki hali (${chatTime(h.edited_at)} öncesi):</div>
+            <div class="soft" style="white-space:pre-wrap">${h.old_content || ""}</div>
+          </div>`)}
+    </${Modal}>`;
 }
 
 function rulesTextFor(room, isTraffic) {
