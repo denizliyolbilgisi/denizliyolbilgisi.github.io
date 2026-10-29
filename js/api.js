@@ -200,9 +200,30 @@ export const messageReactors = async (id) => (await rpc("message_reactors", { p_
 export const messageEditHistory = async (id) => (await rpc("message_edit_history", { p_id: id })) || [];
 
 /** Tepki sayıları sabit sırayla: [["👍", 3], ...] */
+/** Tepki sayıları, çoktan aza: [["👍", 3], ...] */
 export function reactionCounts(m) {
   const list = m.message_reactions || [];
-  return REACTIONS.map((e) => [e, list.filter((r) => r.emoji === e).length]).filter(([, n]) => n > 0);
+  const order = [];
+  const count = {};
+  list.forEach((r) => {
+    if (!(r.emoji in count)) { order.push(r.emoji); count[r.emoji] = 0; }
+    count[r.emoji]++;
+  });
+  return order.map((e) => [e, count[e]]).sort((a, b) => b[1] - a[1]);
+}
+
+/** Mesaj sadece emojiden oluşuyorsa emoji sayısı (değilse null) */
+export function emojiOnlyCount(text) {
+  const t = (text || "").replace(/\s+/g, "");
+  if (!t || t.length > 40) return null;
+  try {
+    if (!/^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\uFE0F|\u200D|\u20E3)+$/u.test(t)) return null;
+    if (!/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(t)) return null;
+    if (typeof Intl !== "undefined" && Intl.Segmenter) return [...new Intl.Segmenter().segment(t)].length;
+    return [...t].length;
+  } catch (_) {
+    return null;
+  }
 }
 export const myReaction = (m, uid) => (m.message_reactions || []).find((r) => r.user_id === uid)?.emoji || null;
 
@@ -371,12 +392,22 @@ export async function adminResetPassword(userId) {
 // Radarlar
 // ---------------------------------------------------------------------------
 export const RADAR_TYPES = [
-  { key: "sabit", label: "Sabit Radar", letter: "S", color: "#E53935" },
-  { key: "mobil", label: "Mobil Radar", letter: "M", color: "#FB8C00" },
-  { key: "cevirme", label: "Çevirme", letter: "Ç", color: "#8E24AA" },
-  { key: "kamera", label: "Hız Kamerası", letter: "K", color: "#1E88E5" },
+  { key: "radar", label: "Radar", emoji: "🚔", color: "#FB8C00", minutes: 30, beep: true },
+  { key: "kaza", label: "Kaza", emoji: "💥", color: "#E53935", minutes: 60, beep: true },
+  { key: "yavaslama", label: "Yavaşlama", emoji: "🚗", color: "#E53935", minutes: 30, beep: true },
+  { key: "yol_calismasi", label: "Yol çalışması", emoji: "🚧", color: "#F9A825", minutes: 1440, beep: false },
+  { key: "kapali_serit", label: "Kapalı şerit", emoji: "🚫", color: "#F9A825", minutes: 180, beep: false },
+  { key: "yolda_nesne", label: "Yolda nesne", emoji: "⚠️", color: "#F9A825", minutes: 60, beep: false },
+  { key: "buzlanma", label: "Buzlanma / Sis", emoji: "🧊", color: "#4FC3F7", minutes: 180, beep: true },
 ];
-export const radarType = (k) => RADAR_TYPES.find((t) => t.key === k) || RADAR_TYPES[1];
+// Eski türler (mobil, sabit, çevirme, kamera) Radar sayılır
+export const radarType = (k) => RADAR_TYPES.find((t) => t.key === k) || RADAR_TYPES[0];
+/** "30 dk", "3 saat", "1 gün" */
+export function durationText(min) {
+  if (min % 1440 === 0) return `${min / 1440} gün`;
+  if (min % 60 === 0) return `${min / 60} saat`;
+  return `${min} dk`;
+}
 
 export const nearbyRadars = (lat, lng, radius) =>
   rpc("nearby_radars", { p_lat: lat, p_lng: lng, p_radius_m: radius });

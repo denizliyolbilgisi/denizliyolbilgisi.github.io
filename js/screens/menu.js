@@ -93,7 +93,13 @@ export function MenuScreen({ onBanned }) {
       setRadarError(false);
     }).catch(() => setRadarError(true));
     api.refreshConfig().then(() => {
-      setAnnouncement({ text: api.cfgText("announcement"), warn: api.cfgText("announcement_level") === "warning" });
+      // Duyuru hedefi: "herkes" (varsayılan), "android" (iPhone'da gizli) ya da "ios".
+      // announcement_ios doluysa iPhone'a sadece o gösterilir.
+      const only = api.cfgText("announcement_ios");
+      const target = api.cfgText("announcement_target", "herkes");
+      setAnnouncement(only
+        ? { text: only, warn: api.cfgText("announcement_ios_level") === "warning" }
+        : { text: target === "android" ? "" : api.cfgText("announcement"), warn: api.cfgText("announcement_level") === "warning" });
     }).catch(() => {});
     setPushPerm(permission());
   }
@@ -105,11 +111,11 @@ export function MenuScreen({ onBanned }) {
   // Harita kartı
   const lastRadar = radars && radars.length
     ? radars.reduce((a, b) => ((a.created_at || "") > (b.created_at || "") ? a : b)) : null;
-  const radarText = radars ? (radars.length ? `${radars.length} aktif radar` : "Şu an aktif radar yok")
-    : radarError ? "Radar bilgisi alınamadı" : "Yükleniyor…";
+  const radarText = radars ? (radars.length ? `${radars.length} aktif bildirim` : "Şu an aktif bildirim yok")
+    : radarError ? "Harita bilgisi alınamadı" : "Yükleniyor…";
   const radarLine = lastRadar
-    ? ["Son: " + api.radarType(lastRadar.type).label, lastRadar.place, agoText(lastRadar.created_at)].filter(Boolean).join(" • ")
-    : "Radar ve denetim noktaları";
+    ? ["Son: " + api.radarType(lastRadar.type).emoji + " " + api.radarType(lastRadar.type).label, lastRadar.place, agoText(lastRadar.created_at)].filter(Boolean).join(" • ")
+    : "Radar, kaza ve yol durumu";
 
   const roomLine = (r) => {
     if (!r.last_message_id) return r.description || "";

@@ -1,4 +1,4 @@
-// Harita: radarlar, radar bildirme, "Hâlâ orada / Kalkmış", 500 m yaklaşma uyarısı
+// Harita: radar, kaza, yol durumu bildirimleri, "Hâlâ var / Yok", 500 m yaklaşma uyarısı
 import { html, useState, useEffect, useRef, navigate, userMessage, clock, agoText, sleep } from "../lib.js";
 import * as api from "../api.js";
 import { Modal, Spinner, useInterval, useOnResume } from "../ui.js";
@@ -23,9 +23,12 @@ function minutesLeft(expires) {
 
 function remaining(expires) {
   const m = minutesLeft(expires);
-  if (m === null) return "Süresiz (sabit)";
+  if (m === null) return "Süresiz";
   if (m <= 0) return "Süresi doluyor";
-  return `${m} dk`;
+  if (m < 60) return `${m} dk`;
+  if (m < 1440) return m % 60 ? `${Math.floor(m / 60)} saat ${m % 60} dk` : `${m / 60} saat`;
+  const h = Math.floor((m % 1440) / 60);
+  return h ? `${Math.floor(m / 1440)} gün ${h} saat` : `${Math.floor(m / 1440)} gün`;
 }
 
 // ---------- Sesli uyarı (iPhone'da ilk dokunuştan sonra çalışır) ----------
@@ -120,7 +123,7 @@ export function MapScreen({ focusRadarId, openReport }) {
       lastFetch.current = center;
       return list || [];
     } catch (e) {
-      setMsg("Radarlar yüklenemedi: " + userMessage(e));
+      setMsg("Bildirimler yüklenemedi: " + userMessage(e));
       return null;
     }
   }
@@ -159,8 +162,8 @@ export function MapScreen({ focusRadarId, openReport }) {
       L.marker([r.lat, r.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="${cls}" style="background:${t.color}">${t.letter}</div>`,
-          iconSize: [30, 30], iconAnchor: [15, 15],
+          html: `<div class="${cls}" style="background:${t.color}">${t.emoji}</div>`,
+          iconSize: [36, 36], iconAnchor: [18, 18],
         }),
       }).on("click", () => setSelected(r)).addTo(layer);
     });
@@ -184,7 +187,7 @@ export function MapScreen({ focusRadarId, openReport }) {
         setSelected(r);
         setTimeout(() => setFocusId(null), 4500);
       } else {
-        setMsg("Bu radar artık aktif değil.");
+        setMsg("Bu bildirim artık aktif değil.");
       }
     })();
   }, [focusRadarId]);
@@ -197,9 +200,10 @@ export function MapScreen({ focusRadarId, openReport }) {
     }
   }, [openReport]);
 
-  // En yakın radar (500 m içinde) ve bir kez sesli uyarı
-  const nearest = loc && radars.length
-    ? radars.map((r) => [r, distance(loc, r)]).sort((a, b) => a[1] - b[1])[0] : null;
+  // En yakın uyarılı bildirim (500 m içinde) ve bir kez sesli uyarı. Yol çalışması gibi bipsiz türler sayılmaz.
+  const beepers = radars.filter((r) => api.radarType(r.type).beep);
+  const nearest = loc && beepers.length
+    ? beepers.map((r) => [r, distance(loc, r)]).sort((a, b) => a[1] - b[1])[0] : null;
   const alert = nearest && nearest[1] <= ALERT_DISTANCE_M ? nearest : null;
   useEffect(() => {
     if (alert && !alerted.current.has(alert[0].id)) {
@@ -226,7 +230,7 @@ export function MapScreen({ focusRadarId, openReport }) {
     try {
       const place = await api.placeName(loc.lat, loc.lng);
       await api.reportRadar(type.key, loc.lat, loc.lng, place);
-      setMsg(`${type.label} bildirildi, teşekkürler!`);
+      setMsg(`${type.emoji} ${type.label} bildirildi, teşekkürler!`);
       await load(loc);
     } catch (e) {
       setMsg("Bildirilemedi: " + userMessage(e));
@@ -241,7 +245,7 @@ export function MapScreen({ focusRadarId, openReport }) {
       await api.voteRadar(r.id, stillThere);
       const list = await load(loc || DENIZLI);
       if (stillThere) {
-        setMsg("Onaylandı, süre 30 dk uzadı. Teşekkürler!");
+        setMsg(`Onaylandı, süre ${api.durationText(api.radarType(r.type).minutes)} uzadı. Teşekkürler!`);
         setSelected((list || []).find((x) => x.id === r.id) || null);
       } else {
         setMsg("Bildirildi, teşekkürler!");
@@ -261,13 +265,17 @@ export function MapScreen({ focusRadarId, openReport }) {
 
       <div class="map-top">
         <button class="btn back" onClick=${() => navigate("/menu")}>← Menü</button>
-        <div class="legend">
-          ${api.RADAR_TYPES.map((t) => html`<div key=${t.key}><i class="c" style=${`background:${t.color}`}></i>${t.label}</div>`)}
-        </div>
+        ${(() => {
+          // Sadece haritada olan türler
+          const present = api.RADAR_TYPES.filter((t) => radars.some((r) => api.radarType(r.type).key === t.key));
+          return present.length > 0 && html`<div class="legend">
+            ${present.map((t) => html`<div key=${t.key}><i class="c" style=${`background:${t.color}`}>${t.emoji}</i>${t.label}</div>`)}
+          </div>`;
+        })()}
       </div>
 
       <div class="map-bottom">
-        ${alert && html`<div class="alert">⚠ ${Math.round(alert[1])} m ileride ${api.radarType(alert[0].type).label}</div>`}
+        ${alert && html`<div class="alert">⚠ ${Math.round(alert[1])} m ileride ${api.radarType(alert[0].type).emoji} ${api.radarType(alert[0].type).label}</div>`}
         ${locError && html`<div class="map-msg">${locError}</div>`}
         ${msg && html`<div class="map-msg">${msg}</div>`}
         <div class="fab-row">
@@ -277,28 +285,41 @@ export function MapScreen({ focusRadarId, openReport }) {
             else setMsg(locError || "Konum aranıyor…");
           }}>◎</button>
           <button class="report-btn" disabled=${busy} onClick=${() => { unlockAudio(); setShowReport(true); }}>
-            ${busy ? html`<${Spinner} small />` : "Radar Bildir"}
+            ${busy ? html`<${Spinner} small />` : "➕ Durum Bildir"}
           </button>
         </div>
       </div>
 
       ${showReport && html`
-        <${Modal} title="Ne gördün?" center=${false} onClose=${() => setShowReport(false)}>
-          ${api.RADAR_TYPES.map((t) => html`
-            <button key=${t.key} class="btn block big" style=${`background:${t.color};margin-bottom:10px`} onClick=${() => report(t)}>${t.label}</button>`)}
-          <button class="btn outline block" onClick=${() => setShowReport(false)}>Vazgeç</button>
-        </${Modal}>`}
+        <div class="rsheet-back" onClick=${() => setShowReport(false)}>
+          <div class="rsheet" onClick=${(e) => e.stopPropagation()}>
+            <div class="rsheet-handle"></div>
+            <div class="row" style="align-items:center">
+              <h2 class="grow" style="margin:0">Durum bildir</h2>
+              <button class="btn ghost" style="font-size:22px" onClick=${() => setShowReport(false)}>✕</button>
+            </div>
+            <div class="muted" style="margin-bottom:10px">Bulunduğun yere eklenir. Ne gördün?</div>
+            <div class="report-grid">
+              ${api.RADAR_TYPES.map((t) => html`
+                <button key=${t.key} class="report-tile" onClick=${() => report(t)}>
+                  <span class="ic" style=${`background:${t.color}`}>${t.emoji}</span>
+                  <b>${t.label}</b>
+                  <small>Haritada ${api.durationText(t.minutes)}</small>
+                </button>`)}
+            </div>
+          </div>
+        </div>`}
 
       ${selected && (() => {
         const t = api.radarType(selected.type);
         return html`
           <${Modal} onClose=${() => setSelected(null)}
             actions=${[
-              html`<button class="btn outline" disabled=${busy} onClick=${() => vote(selected, false)}>Kalkmış</button>`,
-              html`<button class="btn green" disabled=${busy} onClick=${() => vote(selected, true)}>Hâlâ orada</button>`,
+              html`<button class="btn outline" disabled=${busy} onClick=${() => vote(selected, false)}>Yok</button>`,
+              html`<button class="btn green" disabled=${busy} onClick=${() => vote(selected, true)}>Hâlâ var</button>`,
             ]}>
             <div class="row" style="margin-bottom:10px">
-              <div class="radar-pin" style=${`background:${t.color}`}>${t.letter}</div>
+              <div class="radar-pin" style=${`background:${t.color}`}>${t.emoji}</div>
               <h3 style="margin:0">${t.label}</h3>
             </div>
             ${selected.place && html`<div class="info-row"><span class="l">🗺 Yer</span><span>${selected.place}</span></div>`}
@@ -310,8 +331,8 @@ export function MapScreen({ focusRadarId, openReport }) {
               const d = distance(loc, selected);
               return d < 1000 ? Math.round(d / 10) * 10 + " m" : (d / 1000).toFixed(1).replace(".", ",") + " km";
             })()}</span></div>`}
-            <div class="bold" style="margin-top:10px">Bu radar hâlâ orada mı?</div>
-            <div class="muted small">"Hâlâ orada" dersen süre 30 dakika uzar. 5 kişi "Kalkmış" derse radar silinir.</div>
+            <div class="bold" style="margin-top:10px">Bu ${t.label.toLocaleLowerCase("tr-TR")} hâlâ var mı?</div>
+            <div class="muted small">"Hâlâ var" dersen süre ${api.durationText(t.minutes)} uzar. 5 kişi "Yok" derse silinir.</div>
           </${Modal}>`;
       })()}
     </div>`;

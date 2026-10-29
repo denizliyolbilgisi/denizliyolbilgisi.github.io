@@ -2,7 +2,7 @@
 // Bu dosyadaki bilgiler gizli DEĞİLDİR (Android uygulamasında da aynısı var).
 // Asıl güvenlik Supabase'deki kurallardadır.
 
-export const APP_VERSION = "1.1.1";
+export const APP_VERSION = "1.1.3";
 
 export const SUPABASE_URL = "https://thuvpjgimgeolgtekrxi.supabase.co";
 export const SUPABASE_KEY =

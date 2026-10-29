@@ -72,6 +72,10 @@ export function ChatScreen({ roomId, focusId }) {
   const [editing, setEditing] = useState(null);         // düzenlenen mesaj
   const [reactorsFor, setReactorsFor] = useState(null); // tepki listesi
   const [historyFor, setHistoryFor] = useState(null);   // düzenleme geçmişi
+  const [showEmoji, setShowEmoji] = useState(false);     // 😊 paneli
+  const [pickReactionFor, setPickReactionFor] = useState(null); // ➕ tüm emojiler
+  const inputRef = useRef(null);
+  const caretRef = useRef(null);   // imlecin son yeri (emoji buraya eklenir)
   const [menuFor, setMenuFor] = useState(null);
   const [reportFor, setReportFor] = useState(null);
   const [deleteFor, setDeleteFor] = useState(null);
@@ -227,7 +231,7 @@ export function ChatScreen({ roomId, focusId }) {
       try {
         await api.editMessage(editing.id, text);
         setEditing(null);
-        setInput("");
+        setInput(""); caretRef.current = null;
         setError(null);
         await loadMessages();
       } catch (e) {
@@ -248,7 +252,7 @@ export function ChatScreen({ roomId, focusId }) {
       await api.sendMessage(roomId, text, replyTo?.id, uploaded);
       picked.forEach((p) => URL.revokeObjectURL(p.url));
       setPicked([]);
-      setInput("");
+      setInput(""); caretRef.current = null;
       setReplyTo(null);
       setError(null);
       await loadMessages();
@@ -259,6 +263,18 @@ export function ChatScreen({ roomId, focusId }) {
       setSending(false);
       setProgress(null);
     }
+  }
+
+  /** Seçilen emojiyi imlecin olduğu yere ekler */
+  function insertEmoji(emoji) {
+    const c = caretRef.current;
+    const start = c ? Math.min(c[0], input.length) : input.length;
+    const end = c ? Math.min(c[1], input.length) : input.length;
+    const next = input.slice(0, start) + emoji + input.slice(end);
+    if (next.length > MAX_LENGTH) return;
+    setInput(next);
+    const pos = start + emoji.length;
+    caretRef.current = [pos, pos];
   }
 
   async function react(m, emoji) {
@@ -297,7 +313,7 @@ export function ChatScreen({ roomId, focusId }) {
             <button key=${c.username} class="mention-btn"
               onClick=${() => {
                 const start = input.length - typing[1].length - 1;
-                setInput((input.slice(0, start) + "@" + c.username + " ").slice(0, MAX_LENGTH));
+                setInput((input.slice(0, start) + "@" + c.username + " ").slice(0, MAX_LENGTH)); caretRef.current = null;
               }}>
               ${c.username === "herkes" ? "📣 @herkes  (odadaki herkese duyuru)" : `@${c.username} ${roleBadge(c.role)}`}
             </button>`)}
@@ -331,7 +347,7 @@ export function ChatScreen({ roomId, focusId }) {
             <div class="small bold" style="color:#FFD54F">✏️ Mesajını düzenliyorsun</div>
             <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${api.previewText(editing)}</div>
           </div>
-          <button class="btn ghost" onClick=${() => { setEditing(null); setInput(""); }}>✕</button>
+          <button class="btn ghost" onClick=${() => { setEditing(null); setInput(""); caretRef.current = null; }}>✕</button>
         </div>`}
       ${replyTo && html`
         <div class="replybar">
@@ -354,17 +370,26 @@ export function ChatScreen({ roomId, focusId }) {
       ${mentionBox}
       <div class="composer">
         <button class="cam" disabled=${sending || !!editing || picked.length >= api.MAX_PHOTOS} onClick=${() => setPhotoSource(true)}>📷</button>
-        <textarea class="input" rows="1" maxlength=${MAX_LENGTH} value=${input}
+        <button class="emo" disabled=${sending} onClick=${() => {
+          if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
+          else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
+        }}>${showEmoji ? "⌨️" : "😊"}</button>
+        <textarea class="input" rows="1" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
+          onFocus=${() => setShowEmoji(false)}
+          onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
+          onKeyUp=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           placeholder=${editing ? "Mesajını düzelt..." : picked.length ? "Açıklama ekle (isteğe bağlı)" : replyTo ? "Yanıtını yaz..." : "Mesaj yaz..."}
           onInput=${(e) => {
             setInput(e.target.value);
+            caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
           }}></textarea>
         <button class="btn" disabled=${sending || (!input.trim() && !picked.length && !(editing?.photos?.length))} onClick=${send}>
           ${sending ? html`<${Spinner} small />` : editing ? "Kaydet" : "Gönder"}
         </button>
-      </div>`;
+      </div>
+      ${showEmoji && html`<${EmojiPanel} onPick=${insertEmoji} />`}`;
   }
 
   return html`
@@ -411,7 +436,8 @@ export function ChatScreen({ roomId, focusId }) {
                 ${api.reactionCounts(m).length > 0 && html`
                   <button class="reacts" style=${api.myReaction(m, myId) ? "border-color:#3D8BFF" : ""}
                     onClick=${() => setReactorsFor(m)}>
-                    ${api.reactionCounts(m).map(([e, n]) => html`<span key=${e}>${e}${n > 1 ? " " + n : ""}</span>`)}
+                    ${api.reactionCounts(m).slice(0, 4).map(([e, n]) => html`<span key=${e}>${e}${n > 1 ? " " + n : ""}</span>`)}
+                    ${(() => { const rest = api.reactionCounts(m).slice(4).reduce((a, [, n]) => a + n, 0); return rest > 0 && html`<span>+${rest}</span>`; })()}
                   </button>`}
               </div>`;
           })}
@@ -435,12 +461,17 @@ export function ChatScreen({ roomId, focusId }) {
           <${Modal} title=${label(m)} center=${false} onClose=${close}>
             <div class="muted" style="margin-bottom:6px;max-height:4.5em;overflow:hidden">${api.previewText(m)}</div>
             <div class="emoji-row">
-              ${api.REACTIONS.map((e) => html`
-                <button key=${e} class=${api.myReaction(m, myId) === e ? "on" : ""} onClick=${() => { close(); react(m, e); }}>${e}</button>`)}
+              ${(() => {
+                const mine = api.myReaction(m, myId);
+                // Benim tepkim hızlı listede yoksa başta görünsün
+                return [...(mine && !api.REACTIONS.includes(mine) ? [mine] : []), ...api.REACTIONS].slice(0, 6).map((e) => html`
+                  <button key=${e} class=${mine === e ? "on" : ""} onClick=${() => { close(); react(m, e); }}>${e}</button>`);
+              })()}
+              <button class="plus" title="Tüm emojiler" onClick=${() => { close(); setPickReactionFor(m); }}>➕</button>
             </div>
             <button class="list-btn" onClick=${() => { setReplyTo(m); setEditing(null); close(); }}>↩  Yanıtla</button>
             ${api.editable(m, myId) && !(room.read_only && !canModerate) && html`<button class="list-btn"
-              onClick=${() => { setEditing(m); setReplyTo(null); setPicked([]); setInput(m.content || ""); close(); }}>✏️  Düzenle</button>`}
+              onClick=${() => { setEditing(m); setReplyTo(null); setPicked([]); setInput(m.content || ""); caretRef.current = null; close(); }}>✏️  Düzenle</button>`}
             ${m.edited_at && rank >= 2 && html`<button class="list-btn" onClick=${() => { setHistoryFor(m); close(); }}>📝  Düzenleme geçmişi</button>`}
             ${m.content && m.content.trim() && html`<button class="list-btn" onClick=${async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); }}>📋  Kopyala</button>`}
             ${m.photos && m.photos.length > 0 && !m.photos_expired && html`<button class="list-btn" onClick=${() => { setViewer({ msg: m, index: 0 }); close(); }}>🖼  Fotoğrafları aç</button>`}
@@ -451,6 +482,11 @@ export function ChatScreen({ roomId, focusId }) {
             <button class="list-btn muted" onClick=${close}>Vazgeç</button>
           </${Modal}>`;
       })()}
+
+      ${pickReactionFor && html`
+        <${Modal} title="Tepki seç" onClose=${() => setPickReactionFor(null)}>
+          <${EmojiPanel} height=${360} onPick=${(e) => { const m = pickReactionFor; setPickReactionFor(null); react(m, e); }} />
+        </${Modal}>`}
 
       ${reactorsFor && html`<${ReactorsModal} msg=${reactorsFor} myId=${myId} onClose=${() => setReactorsFor(null)}
           onRemove=${(e) => { const m = reactorsFor; setReactorsFor(null); react(m, e); }} />`}
@@ -549,14 +585,44 @@ function ClampText({ text, color }) {
   const ref = useRef(null);
   const [open, setOpen] = useState(false);
   const [overflow, setOverflow] = useState(false);
+  // Sadece 1-3 emojiden oluşan mesaj büyük görünür (WhatsApp gibi)
+  const n = api.emojiOnlyCount(text);
+  const big = n !== null && n >= 1 && n <= 3;
   useLayoutEffect(() => {
     const el = ref.current;
     if (el && !open) setOverflow(el.scrollHeight > el.clientHeight + 2);
   }, [text, open]);
   return html`
-    <div class=${"txt" + (open ? "" : " clamp")} ref=${ref}>${withMentions(text, color)}</div>
+    <div class=${"txt" + (open ? "" : " clamp") + (big ? " big" : "")} ref=${ref}>${withMentions(text, color)}</div>
     ${(overflow || open) && html`<button class="more" style=${`color:${color}`}
       onClick=${(e) => { e.stopPropagation(); setOpen(!open); }}>${open ? "Daha az göster ▲" : "Devamını gör ▼"}</button>`}`;
+}
+
+/** Emoji paneli (kategoriler, arama, son kullanılanlar, ten rengi). Dosyalar vendor/emoji içinde. */
+function EmojiPanel({ onPick, height = 300 }) {
+  const ref = useRef(null);
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
+  useEffect(() => {
+    let el = null;
+    let dead = false;
+    Promise.all([import("../../vendor/emoji/picker.js"), import("../../vendor/emoji/tr.js")])
+      .then(([m, tr]) => {
+        if (dead || !ref.current) return;
+        const Picker = m.default;
+        el = new Picker({
+          locale: "en",
+          dataSource: new URL("../../vendor/emoji/data.json", import.meta.url).href,
+          i18n: tr.default,
+        });
+        el.classList.add("dark");
+        el.addEventListener("emoji-click", (e) => pickRef.current(e.detail.unicode));
+        ref.current.appendChild(el);
+      })
+      .catch(() => { if (ref.current) ref.current.textContent = "Emoji paneli yüklenemedi. İnterneti kontrol et."; });
+    return () => { dead = true; if (el) el.remove(); };
+  }, []);
+  return html`<div class="emoji-panel" ref=${ref} style=${`height:${height}px`}></div>`;
 }
 
 /** Tepki bırakanlar */
