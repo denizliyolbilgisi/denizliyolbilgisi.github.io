@@ -200,3 +200,14 @@ export function pickPhotos({ camera, multiple, onPicked }) {
   document.body.appendChild(input);
   input.click();
 }
+
+/** Uygulama açıkken bildirim gelince (sw.js haber verir) çalışır: ekran hemen yenilenir */
+export function useLive(fn) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  useEffect(() => {
+    const on = (e) => ref.current(e.detail);
+    window.addEventListener("dyb-live", on);
+    return () => window.removeEventListener("dyb-live", on);
+  }, []);
+}

@@ -248,7 +248,7 @@ export function ChatScreen({ roomId, focusId }) {
         const blob = await api.compressPhoto(picked[i].file);
         uploaded.push(await api.uploadPhoto(blob));
       }
-      setProgress(null);
+      setProgress("🕓 Gönderiliyor…");
       await api.sendMessage(roomId, text, replyTo?.id, uploaded);
       picked.forEach((p) => URL.revokeObjectURL(p.url));
       setPicked([]);
@@ -258,7 +258,8 @@ export function ChatScreen({ roomId, focusId }) {
       await loadMessages();
     } catch (e) {
       if (uploaded.length) api.deletePhotos(uploaded);
-      setError(userMessage(e));
+      // Yazdığın silinmez: Gönder'e tekrar basman yeterli
+      setError("❗ Gönderilemedi: " + userMessage(e) + " Tekrar denemek için Gönder'e bas.");
     } finally {
       setSending(false);
       setProgress(null);
@@ -431,7 +432,7 @@ export function ChatScreen({ roomId, focusId }) {
                     </div>`}
                   <${PhotoAlbum} photos=${m.photos} expired=${m.photos_expired} onOpen=${(i) => setViewer({ msg: m, index: i })} />
                   ${m.content && m.content.trim() && html`<${ClampText} text=${m.content} color=${mine || mentionsMe ? "#FFE082" : "#58A6FF"} />`}
-                  <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${m.edited_at ? "düzenlendi • " : ""}${chatTime(m.created_at)}</div>
+                  <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${m.edited_at ? "düzenlendi • " : ""}${chatTime(m.created_at)}${mine ? "  ✓" : ""}</div>
                 </div>
                 ${api.reactionCounts(m).length > 0 && html`
                   <button class="reacts" style=${api.myReaction(m, myId) ? "border-color:#3D8BFF" : ""}

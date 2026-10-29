@@ -1,7 +1,7 @@
 // Karşılama menüsü: Harita + sohbet odaları (küçük kartlar), altta kısayollar
 import { html, useState, useEffect, useRef, navigate, agoText, remainingText, isStillActive, roleRank, toast, store } from "../lib.js";
 import * as api from "../api.js";
-import { Modal, useInterval, useOnResume } from "../ui.js";
+import { Modal, useInterval, useOnResume, useLive } from "../ui.js";
 import { DENIZLI, FETCH_RADIUS_M } from "../config.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
 import { RankUpModal } from "./profile.js";
@@ -12,12 +12,12 @@ const ROOM_COLORS = {
   alim_satim: ["#EC407A", "#AD1457"],
 };
 
-function MenuCard({ icon, colors, title, line, live, liveColor, unread, onClick }) {
+function MenuCard({ icon, colors, title, line, live, liveColor, unread, count = 0, onClick }) {
   return html`
     <button class=${"mcard" + (unread ? " unread" : "")} onClick=${onClick}>
       <div class="ico" style=${`background:linear-gradient(135deg,${colors[0]},${colors[1]})`}>${icon}</div>
       <div class="body">
-        <div class="t"><span>${title}</span>${unread && html`<em class="new-pill" style="font-style:normal">YENİ</em>`}</div>
+        <div class="t"><span>${title}</span>${unread && html`<em class="new-pill" style="font-style:normal">${count >= 99 ? "99+ " : count > 0 ? count + " " : ""}YENİ</em>`}</div>
         ${line && html`<div class="line">${line}</div>`}
         <div class="live"><i class="dot" style=${`background:${liveColor}`}></i>${live}</div>
       </div>
@@ -42,6 +42,7 @@ export function MenuScreen({ onBanned }) {
   const [radarError, setRadarError] = useState(false);
   const [openReports, setOpenReports] = useState(0);
   const [dmUnread, setDmUnread] = useState(0);         // okunmamış özel mesaj
+  const [roomUnread, setRoomUnread] = useState({});     // oda başına okunmamış
   const [announcement, setAnnouncement] = useState({ text: "", warn: false });
   const [tick, setTick] = useState(0);
   const [rankUp, setRankUp] = useState(null);   // { icon, name }
@@ -106,7 +107,21 @@ export function MenuScreen({ onBanned }) {
     setPushPerm(permission());
   }
 
-  useEffect(() => { refresh(); }, []);
+  // Hafif yenileme: odalar, okunmamış sayıları, özel mesaj rozeti
+  async function liveRefresh() {
+    try {
+      const list = await api.roomsOverview();
+      if (list.length) setRooms(list);
+      setChatError(false);
+      setRoomUnread(await api.roomUnreadCounts(list.length ? list : rooms));
+    } catch (_) { /* */ }
+    api.dmUnreadTotal().then((n) => setDmUnread(n || 0)).catch(() => {});
+  }
+
+  useEffect(() => { refresh(); liveRefresh(); }, []);
+  // Bildirim gelince hemen; gelmese de 15 sn'de bir
+  useLive((kind) => { if (kind === "radar") refresh(); else liveRefresh(); });
+  useInterval(liveRefresh, 15000);
   useInterval(() => { refresh(); setTick((t) => t + 1); }, 30000);
   useOnResume(refresh);
 
@@ -176,7 +191,8 @@ export function MenuScreen({ onBanned }) {
             line=${roomLine(r)}
             live=${roomStatus(r) + (isStillActive(r.muted_until) && rank < 4 ? " • 🔇 susturuldun" : "")}
             liveColor=${chatError ? "#FFB020" : "#3DDC84"}
-            unread=${api.hasUnread(r, me?.username)}
+            unread=${api.hasUnread(r, me?.username) || (roomUnread[r.id] || 0) > 0}
+            count=${roomUnread[r.id] || 0}
             onClick=${() => navigate("/oda/" + r.id)} />`)}
       </div>
 

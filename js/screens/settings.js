@@ -1,4 +1,4 @@
-// Ayarlarım: bildirim izni, sohbet / radar sessize alma, oda bazlı bildirim (ayarlar sunucuda tutulur)
+// Ayarlar: telefonun kendi ayarları gibi sade liste (Özel mesajlar • Bildirimler); ayrıntılar alt sayfada
 import { html, useState, useEffect, navigate, userMessage, isStillActive, remainingText, isStandalone, toast, roleBadge } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, Switch, useInterval } from "../ui.js";
@@ -18,18 +18,23 @@ function statusText(until) {
 
 export function SettingsScreen() {
   const [prefs, setPrefs] = useState(null);
+  const [dm, setDm] = useState(null);
   const [rooms, setRooms] = useState(api.cachedRooms());
-  const [silenceFor, setSilenceFor] = useState(null);     // "chat" | "radar"
+  const [page, setPage] = useState(null);              // null | chat | radar | blocks
+  const [silenceFor, setSilenceFor] = useState(null);  // "chat" | "radar"
+  const [confirmClose, setConfirmClose] = useState(false);
   const [err, setErr] = useState(null);
   const [perm, setPerm] = useState(permission());
   const [busy, setBusy] = useState(false);
   const [, setTick] = useState(0);
 
+  const loadDm = () => api.myDmSettings().then(setDm).catch((e) => setErr(userMessage(e)));
   useEffect(() => {
     api.myNotificationPrefs().then(setPrefs).catch((e) => {
       setErr("Ayarlar yüklenemedi: " + userMessage(e));
       setPrefs({ chat_muted_until: null, radar_muted_until: null, rooms_off: [] });
     });
+    loadDm();
     api.roomsOverview().then((l) => l.length && setRooms(l)).catch(() => {});
   }, []);
   useInterval(() => setTick((t) => t + 1), 30000);
@@ -45,7 +50,12 @@ export function SettingsScreen() {
       setErr("Kaydedilemedi: " + userMessage(e));
     }
   }
-
+  async function dmAction(fn) {
+    if (busy) return;
+    setBusy(true);
+    try { await fn(); await loadDm(); setErr(null); } catch (e) { setErr(userMessage(e)); }
+    setBusy(false);
+  }
   async function turnOn() {
     setBusy(true);
     try {
@@ -58,82 +68,120 @@ export function SettingsScreen() {
     setBusy(false);
   }
 
-  // Bildirim izni kartı
-  let permCard;
+  // Bildirim izni satırı
+  let permRow = null;
   if (!pushConfigured()) {
-    permCard = html`<div class="card" style="border-color:#B26A00"><b>🔔 Bildirimler yakında</b><div class="soft">Bildirim altyapısı henüz kuruluyor.</div></div>`;
+    permRow = html`<div class="set-warn">🔔 Bildirim altyapısı henüz kuruluyor.</div>`;
   } else if (!isStandalone() || !pushSupported()) {
-    permCard = html`
-      <div class="card" style="border-color:#B26A00">
-        <b>📲 Bildirim için ana ekrana ekle</b>
-        <div class="soft">iPhone'da bildirimler sadece ana ekrana eklenmiş DYB'de çalışır (iOS 16.4 ve üstü). Safari'de Paylaş ⬆️ → "Ana Ekrana Ekle".</div>
-      </div>`;
-  } else if (perm === "granted") {
-    permCard = html`<div class="card"><b>🔔 Bildirim izni: Açık ✅</b><div class="soft small">Ses ve titreşim: iPhone Ayarlar → Bildirimler → DYB</div></div>`;
+    permRow = html`<div class="set-warn">📲 Bildirim için DYB'yi ana ekrana ekle: Safari'de Paylaş ⬆️ → "Ana Ekrana Ekle" (iOS 16.4+).</div>`;
   } else if (perm === "denied") {
-    permCard = html`
-      <div class="card" style="background:#5A1E1E;border-color:#FF6B6B">
-        <b>⚠️ Bildirim izni kapalı</b>
-        <div>Hiçbir bildirim gelmez. Açmak için: iPhone <b>Ayarlar → Bildirimler → DYB → Bildirimlere İzin Ver</b>.</div>
-      </div>`;
-  } else {
-    permCard = html`
-      <div class="card" style="border-color:var(--blue)">
-        <b>🔔 Bildirimler kapalı</b>
-        <div class="soft" style="margin-bottom:10px">Yeni radar ve mesajlardan haberdar olmak için aç.</div>
-        <button class="btn block big" disabled=${busy} onClick=${turnOn}>${busy ? html`<${Spinner} small />` : "Bildirimleri Aç"}</button>
-      </div>`;
+    permRow = html`<div class="set-warn red">⚠️ Bildirim izni kapalı. iPhone Ayarlar → Bildirimler → DYB → İzin Ver.</div>`;
+  } else if (perm !== "granted") {
+    permRow = html`<button class="set-warn blue" disabled=${busy} onClick=${turnOn}>🔔 Bildirimler kapalı — açmak için dokun</button>`;
   }
 
-  const Category = ({ kind, title, subtitle }) => {
-    const until = prefs?.[kind === "chat" ? "chat_muted_until" : "radar_muted_until"];
-    const muted = isStillActive(until);
-    return html`
-      <div class="card" style=${muted ? "border-color:#E07B00" : ""}>
-        <h2>${title}</h2>
-        <div class="soft">${subtitle}</div>
-        <div class="bold" style=${`margin:8px 0 10px;font-size:17px;color:${muted ? "#FFC27A" : "#8BE0A4"}`}>Durum: ${statusText(until)}</div>
-        ${muted
-          ? html`<button class="btn block big green" onClick=${() => save({ ...prefs, [kind === "chat" ? "chat_muted_until" : "radar_muted_until"]: null })}>🔔 Bildirimleri Şimdi Aç</button>`
-          : html`<button class="btn block big orange" onClick=${() => setSilenceFor(kind)}>🔕 Sessize Al / Kapat</button>`}
-      </div>`;
+  const key = (k) => (k === "chat" ? "chat_muted_until" : "radar_muted_until");
+  const statusRow = (k) => {
+    const until = prefs?.[key(k)];
+    return { text: statusText(until), muted: isStillActive(until) };
   };
+  const title = page === "chat" ? "💬 Sohbet bildirimleri" : page === "radar" ? "🚔 Harita bildirimleri"
+    : page === "blocks" ? "🚫 Engellediklerim" : "Ayarlar";
+
+  let content;
+  if (!prefs) {
+    content = html`<${Spinner} />`;
+  } else if (page === "chat" || page === "radar") {
+    const st = statusRow(page);
+    content = html`
+      <div class="set-sec">SESSİZE AL</div>
+      <div class="set-grp">
+        ${st.muted
+          ? html`<${Row} icon="🔕" color="#B45309" title=${"Şu an: " + st.text} value="Şimdi aç" valueClass="g"
+              onClick=${() => save({ ...prefs, [key(page)]: null })} />`
+          : html`<${Row} icon="🔕" color="#B45309" title="Sessize al / kapat" sub="15 dakikadan tamamen kapatmaya kadar"
+              onClick=${() => setSilenceFor(page)} />`}
+      </div>
+      ${page === "chat" && html`
+        <div class="set-sec">HANGİ ODALARDAN BİLDİRİM GELSİN</div>
+        <div class="set-grp">
+          ${rooms.map((r) => html`<${Row} key=${r.id} icon=${r.icon} color="#26323F" title=${r.name}
+              checked=${!(prefs.rooms_off || []).includes(r.id)}
+              onToggle=${(on) => {
+                const off = new Set(prefs.rooms_off || []);
+                on ? off.delete(r.id) : off.add(r.id);
+                save({ ...prefs, rooms_off: [...off] });
+              }} />`)}
+        </div>
+        <div class="set-foot">Kapattığın odanın mesajları uygulamada görünmeye devam eder, sadece bildirim gelmez. @etiket ve yanıtlar her zaman gelir.</div>`}
+      <div class="set-foot">Ses ve titreşim: iPhone Ayarlar → Bildirimler → DYB</div>`;
+  } else if (page === "blocks") {
+    const list = dm?.blocks || [];
+    content = list.length === 0
+      ? html`<div class="set-foot" style="font-size:15px">Kimseyi engellemedin. Bir üyeyi engellemek için sohbette adına dokun → "Özel mesaj için engelle".</div>`
+      : html`
+        <div class="set-sec">ÖZEL MESAJ GÖNDEREMEYENLER</div>
+        <div class="set-grp">
+          ${list.map((b) => html`<${Row} key=${b.user_id} icon=${(b.username || "?").charAt(0).toUpperCase()} color="#475569"
+              title=${`@${b.username || ""} ${roleBadge(b.role)}`} value="Engeli kaldır" valueClass="g"
+              onClick=${() => dmAction(() => api.blockUser(b.user_id, false))} />`)}
+        </div>`;
+  } else {
+    const chat = statusRow("chat");
+    const radar = statusRow("radar");
+    content = html`
+      <div class="set-sec">ÖZEL MESAJLAR</div>
+      <div class="set-grp">
+        <${Row} icon="✉️" color="#2563EB" title="Bana özel mesaj yazılabilsin"
+          sub=${dm && !dm.dm_open ? "🔒 Kapalı: sadece yönetim yazabilir" : "Kapatırsan sadece yönetim yazabilir"}
+          checked=${dm ? dm.dm_open : true}
+          onToggle=${(on) => { if (on) dmAction(() => api.setDmOpen(true)); else setConfirmClose(true); }} />
+        <${Row} icon="👁" color="#0EA5E9" title="Okundu bilgisi" sub="Kapalıysa mavi tik göstermezsin, başkalarınınkini de görmezsin"
+          checked=${dm ? dm.read_receipts !== false : true}
+          onToggle=${(on) => dmAction(() => api.setReadReceipts(on))} />
+        <${Row} icon="🚫" color="#DC2626" title="Engellediklerim" value=${(dm?.blocks || []).length + " kişi"}
+          onClick=${() => setPage("blocks")} />
+      </div>
+
+      <div class="set-sec">BİLDİRİMLER</div>
+      <div class="set-grp">
+        <${Row} icon="💬" color="#F59E0B" title="Sohbet odaları" sub="Sessize alma, oda seçimi"
+          value=${chat.text} valueClass=${chat.muted ? "o" : "g"} onClick=${() => setPage("chat")} />
+        <${Row} icon="✉️" color="#7C3AED" title="Özel mesaj bildirimleri" checked=${dm ? !dm.dm_notify_off : true}
+          onToggle=${(on) => dmAction(() => api.setDmNotify(!on))} />
+        <${Row} icon="🚔" color="#EF4444" title="Harita bildirimleri" sub="Radar, kaza, yavaşlama, buzlanma"
+          value=${radar.text} valueClass=${radar.muted ? "o" : "g"} onClick=${() => setPage("radar")} />
+      </div>
+      <div class="set-foot">DYB iPhone ${APP_VERSION} • Ayarlar hesabına kaydedilir. Haritadaki bip sesi bu ayarlardan etkilenmez.</div>`;
+  }
 
   return html`
     <div class="screen">
-      <${TopBar} title="⚙️ Ayarlarım" onBack=${() => navigate("/menu")} />
-      <div class="content">
-        ${permCard}
+      <${TopBar} title=${title} backLabel="←" onBack=${() => (page ? setPage(null) : navigate("/menu"))} />
+      <div class="set-wrap">
+        ${permRow}
         ${err && html`<div class="msg err">${err}</div>`}
-        <${DmSettingsCard} />
-        ${!prefs ? html`<${Spinner} />` : html`
-          <${Category} kind="chat" title="💬 Sohbet bildirimleri" subtitle="Sohbet odalarına yeni mesaj gelince" />
-          <div class="card">
-            <h2>🗂 Hangi odalardan bildirim gelsin?</h2>
-            <div class="soft">Kapattığın odanın mesajları uygulamada görünmeye devam eder, sadece bildirim gelmez.</div>
-            ${rooms.map((r) => html`
-              <${Switch} key=${r.id} label=${`${r.icon} ${r.name}`} checked=${!(prefs.rooms_off || []).includes(r.id)}
-                onChange=${(on) => {
-                  const off = new Set(prefs.rooms_off || []);
-                  on ? off.delete(r.id) : off.add(r.id);
-                  save({ ...prefs, rooms_off: [...off] });
-                }} />`)}
-            <div class="soft small" style="margin-top:8px">📣 Biri seni @etiketlediğinde ya da mesajına yanıt verdiğinde, oda kapalı olsa bile bildirim gelir.</div>
-          </div>
-          <${Category} kind="radar" title="🚨 Radar bildirimleri" subtitle="Radar, kaza, yavaşlama ya da buzlanma bildirilince" />
-        `}
-        <div class="soft small">Bu ayarlar hesabına kaydedilir. Haritadaki yaklaşma uyarısı (bip sesi) bu ayarlardan etkilenmez.</div>
-        <div class="muted small" style="text-align:center">DYB iPhone sürümü ${APP_VERSION}</div>
+        ${content}
       </div>
 
+      ${confirmClose && html`
+        <${Modal} title="🔒 Özel mesajlar kapansın mı?" onClose=${() => setConfirmClose(false)}
+          actions=${[
+            html`<button class="btn outline" onClick=${() => setConfirmClose(false)}>Vazgeç</button>`,
+            html`<button class="btn orange" onClick=${() => { setConfirmClose(false); dmAction(() => api.setDmOpen(false)); }}>Kapat</button>`,
+          ]}>
+          <div style="font-size:16px">Kapatınca üyeler sana özel mesaj yazamaz; yazmaya çalışan "Bu kullanıcı özel mesaj yolunu kapatmıştır" uyarısını görür.
+            Kurucu ve yöneticiler yine de yazabilir. Eski konuşmaların silinmez. İstediğin zaman tekrar açabilirsin.</div>
+        </${Modal}>`}
+
       ${silenceFor && html`
-        <${Modal} title=${(silenceFor === "chat" ? "Sohbet" : "Radar") + " bildirimleri – sessize al"} center=${false}
+        <${Modal} title=${(silenceFor === "chat" ? "Sohbet" : "Harita") + " bildirimleri – sessize al"} center=${false}
           onClose=${() => setSilenceFor(null)}>
           ${SILENCE.map(([label, min]) => html`
             <button class="list-btn" key=${label} style=${min === null ? "color:#FF8A80;font-weight:700" : ""}
               onClick=${() => {
                 const until = min === null ? FOREVER : new Date(Date.now() + min * 60000).toISOString();
-                save({ ...prefs, [silenceFor === "chat" ? "chat_muted_until" : "radar_muted_until"]: until });
+                save({ ...prefs, [key(silenceFor)]: until });
                 setSilenceFor(null);
               }}>${label}</button>`)}
           <button class="list-btn muted" onClick=${() => setSilenceFor(null)}>Vazgeç</button>
@@ -141,52 +189,17 @@ export function SettingsScreen() {
     </div>`;
 }
 
-/** Özel mesajlarım: aç / kapat (sunucuda kayıt altına alınır), bildirim, engellediklerim */
-function DmSettingsCard() {
-  const [st, setSt] = useState(null);
-  const [err, setErr] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [confirmClose, setConfirmClose] = useState(false);
-
-  const load = () => api.myDmSettings().then((x) => { setSt(x); setErr(null); }).catch((e) => setErr(userMessage(e)));
-  useEffect(() => { load(); }, []);
-
-  async function run(fn) {
-    setBusy(true);
-    try { await fn(); await load(); } catch (e) { setErr(userMessage(e)); }
-    setBusy(false);
-  }
-
-  if (!st) return html`<div class="card"><h2>✉️ Özel mesajlar</h2><div class=${err ? "msg err" : "soft"}>${err || "Yükleniyor…"}</div></div>`;
+/** Tek satır: simge • ad (+ açıklama) • sağda değer + › ya da aç/kapa */
+function Row({ icon, color, title, sub, value, valueClass = "", checked, onToggle, onClick }) {
+  const toggle = checked !== undefined;
   return html`
-    <div class="card" style=${st.dm_open ? "" : "border-color:#B26A00"}>
-      <h2>✉️ Özel mesajlar</h2>
-      <div style=${`font-size:16px;color:${st.dm_open ? "#8BE0A4" : "#FFC27A"}`}>
-        ${st.dm_open ? "🔓 Açık: üyeler sana özel mesaj yazabilir." : "🔒 Kapalı: sana kimse yazamaz. Sadece kurucu ve yöneticiler gerektiğinde ulaşabilir."}
-      </div>
-      <${Switch} label="Bana özel mesaj yazılabilsin" checked=${st.dm_open}
-        onChange=${(on) => { if (busy) return; if (on) run(() => api.setDmOpen(true)); else setConfirmClose(true); }} />
-      ${st.dm_changed_at && html`<div class="soft small">Son değişiklik: ${new Date(st.dm_changed_at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}</div>`}
-      <${Switch} label="🔔 Özel mesaj bildirimleri" checked=${!st.dm_notify_off}
-        onChange=${(on) => run(() => api.setDmNotify(!on))} />
-      <div class="bold" style="margin-top:10px;font-size:18px">🚫 Engellediklerim</div>
-      ${(st.blocks || []).length === 0
-        ? html`<div class="soft small">Kimseyi engellemedin. Bir üyeyi engellemek için sohbette adına dokun → "Özel mesaj için engelle".</div>`
-        : st.blocks.map((b) => html`
-          <div class="row" key=${b.user_id} style="margin-top:6px">
-            <span class="grow" style="font-size:17px">@${b.username || ""} ${roleBadge(b.role)}</span>
-            <button class="btn outline" disabled=${busy} onClick=${() => run(() => api.blockUser(b.user_id, false))}>Engeli kaldır</button>
-          </div>`)}
-      ${err && html`<div class="msg err">${err}</div>`}
-
-      ${confirmClose && html`
-        <${Modal} title="🔒 Özel mesajlar kapansın mı?" onClose=${() => setConfirmClose(false)}
-          actions=${[
-            html`<button class="btn outline" onClick=${() => setConfirmClose(false)}>Vazgeç</button>`,
-            html`<button class="btn orange" onClick=${() => { setConfirmClose(false); run(() => api.setDmOpen(false)); }}>Kapat</button>`,
-          ]}>
-          <div style="font-size:16px">Kapatınca üyeler sana özel mesaj yazamaz; yazmaya çalışan "Bu kullanıcı özel mesaj yolunu kapatmıştır" uyarısını görür.
-            Kurucu ve yöneticiler yine de yazabilir. Eski konuşmaların silinmez. İstediğin zaman tekrar açabilirsin.</div>
-        </${Modal}>`}
+    <div class="set-row" onClick=${toggle ? () => onToggle(!checked) : onClick} style=${toggle || onClick ? "cursor:pointer" : ""}>
+      <div class="set-ic" style=${`background:${color}`}>${icon}</div>
+      <div class="set-t"><b>${title}</b>${sub && html`<small>${sub}</small>`}</div>
+      ${value && html`<span class=${"set-v " + valueClass}>${value}</span>`}
+      ${toggle
+        ? html`<span class="switch" onClick=${(e) => e.stopPropagation()}>
+            <input type="checkbox" checked=${checked} onChange=${(e) => onToggle(e.target.checked)} /><span></span></span>`
+        : onClick && html`<span class="set-ch">›</span>`}
     </div>`;
 }

@@ -64,6 +64,9 @@ export const store = {
 // Hata mesajları (teknik ayrıntı asla gösterilmez)
 // ---------------------------------------------------------------------------
 const SAFE_PREFIXES = [
+  "Bu kullanıcı özel", "Bu kullanıcıya özel", "Özel mesajların kapalı", "Bu kişiyi engelledin", "Bu üyeye mesaj",
+  "Kendine mesaj", "Kendini engelleyemezsin", "Kurucu ve yöneticiler", "Konuşma bulunamadı", "Bugün çok fazla",
+  "Sadece kendi mesajını", "Geçersiz bildirim", "Bildirim bulunamadı",
   "Yeni kod için", "Çok hızlı yazıyorsun", "Çok fazla bildirim", "Geçersiz radar", "Radar bulunamadı",
   "Giriş gerekli", "Davet kodu", "Geçersiz veya kullanılmış", "Kullanıcı adı", "Bu kullanıcı adı",
   "Susturuldun", "Hesabın askıya alındı", "Yöneticiler", "Sebep yazmalısın", "Bu işlem için yetkin yok",

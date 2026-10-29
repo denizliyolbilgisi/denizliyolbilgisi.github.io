@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.1.4";
+const VERSION = "dyb-1.1.5";
 
 const SHELL = [
   "./",
@@ -102,7 +102,12 @@ self.addEventListener("push", (event) => {
     tag = "oda-" + room;
   }
 
-  event.waitUntil(
+  // Uygulama açıksa ekranı hemen yenilet (rozet, oda listesi, sohbet)
+  const tellClients = self.clients.matchAll({ type: "window", includeUncontrolled: true })
+    .then((all) => all.forEach((c) => { try { c.postMessage({ type: "dyb-live", kind: type }); } catch (_) { /* */ } }))
+    .catch(() => {});
+
+  event.waitUntil(Promise.all([tellClients,
     self.registration.showNotification(title, {
       body,
       tag,
@@ -110,8 +115,7 @@ self.addEventListener("push", (event) => {
       icon: "./icons/icon-192.png",
       badge: "./icons/badge-96.png",
       data: { url },
-    })
-  );
+    })]));
 });
 
 // ---------- Bildirime dokunuldu ----------

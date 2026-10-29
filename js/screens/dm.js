@@ -1,7 +1,7 @@
 // Özel mesajlar: gelen kutusu ve birebir sohbet
 import { html, useState, useEffect, useRef, navigate, userMessage, chatTime, roleBadge, toast, copyText } from "../lib.js";
 import * as api from "../api.js";
-import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume } from "../ui.js";
+import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume, useLive } from "../ui.js";
 import { MemberProfileModal } from "./profile.js";
 import { EmojiPanel, ReportDialog } from "./chat.js";
 
@@ -24,11 +24,13 @@ function Avatar({ name, id }) {
 export function DmInboxScreen() {
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
+  const [hideFor, setHideFor] = useState(null);   // "sohbeti benden sil"
 
   async function load() {
     try {
       setList(await api.myConversations());
       setErr(null);
+      api.markDmDelivered().catch(() => {});   // gönderenlere ✓✓
     } catch (e) {
       setErr(userMessage(e));
       setList((l) => l || []);
@@ -37,6 +39,7 @@ export function DmInboxScreen() {
   useEffect(() => { load(); }, []);
   useInterval(load, 10000);
   useOnResume(load);
+  useLive((kind) => { if (kind === "dm") load(); });
 
   return html`
     <div class="screen">
@@ -52,7 +55,7 @@ export function DmInboxScreen() {
         : html`
           <div class="dm-list">
             ${list.map((c) => html`
-              <button class="dm-row" key=${c.id} onClick=${() => navigate("/mesaj/" + c.other_id)}>
+              <button class="dm-row" key=${c.id} ...${longPress(() => setHideFor(c), () => navigate("/mesaj/" + c.other_id))}>
                 <${Avatar} name=${c.other_username} id=${c.other_id} />
                 <div class="grow" style="min-width:0">
                   <div class="row" style="gap:6px">
@@ -67,9 +70,34 @@ export function DmInboxScreen() {
                   </div>
                 </div>
               </button>`)}
-            <div class="muted small" style="padding:16px">Özel mesajlar 30 gün sonra silinir. Açma / kapama ve engelleme: ⚙️ Ayarlar</div>
+            <div class="muted small" style="padding:16px">Özel mesajlar 30 gün sonra silinir. Sohbeti silmek için üzerine basılı tut. Açma / kapama ve engelleme: ⚙️ Ayarlar</div>
           </div>`}
+      ${hideFor && html`<${HideModal} name=${"@" + (hideFor.other_username || "")} onClose=${() => setHideFor(null)}
+          onConfirm=${async () => {
+            const c = hideFor;
+            setHideFor(null);
+            try { await api.hideDmConversation(c.id); load(); } catch (e) { setErr(userMessage(e)); }
+          }} />`}
     </div>`;
+}
+
+/** "Sohbeti benden sil" uyarısı (Instagram gibi) */
+function HideModal({ name, onClose, onConfirm }) {
+  return html`
+    <${Modal} title="🗑 Sohbet silinsin mi?" onClose=${onClose}
+      actions=${[
+        html`<button class="btn outline" onClick=${onClose}>Vazgeç</button>`,
+        html`<button class="btn red" onClick=${onConfirm}>Benden sil</button>`,
+      ]}>
+      <div style="font-size:16px">${name} ile olan sohbet sadece <b>senden</b> silinir; karşı taraf görmeye devam eder.</div>
+      <div class="soft" style="margin-top:10px">Bir şikayet olursa yönetim bu konuşmayı 30 gün boyunca inceleyebilir.</div>
+    </${Modal}>`;
+}
+
+/** ✓ gönderildi • ✓✓ iletildi • mavi ✓✓ okundu */
+function Ticks({ status }) {
+  if (!status) return null;
+  return html`<span class=${"ticks" + (status === "read" ? " read" : "")}>${status === "sent" ? "✓" : "✓✓"}</span>`;
 }
 
 // =====================================================================
@@ -91,6 +119,8 @@ export function DmChatScreen({ userId }) {
   const [reportFor, setReportFor] = useState(null);
   const [deleteFor, setDeleteFor] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showHide, setShowHide] = useState(false);
+  const [pending, setPending] = useState([]);   // { id, text, failed } — 🕓 / ❗
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const caretRef = useRef(null);
@@ -132,6 +162,26 @@ export function DmChatScreen({ userId }) {
   useEffect(() => { loadMessages(); }, [convId]);
   useInterval(() => loadMessages(), 4000, [convId]);
   useOnResume(() => { loadStatus(); loadMessages(); });
+  useLive((kind) => { if (kind === "dm") loadMessages(); });
+
+  const scrollDown = () => requestAnimationFrame(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; });
+
+  /** Bekleyen mesajı gönderir: 🕓 → (başarılı) listeye düşer, (hata) ❗ "Tekrar dene" */
+  async function deliver(p) {
+    setPending((l) => l.map((x) => (x.id === p.id ? { ...x, failed: false } : x)));
+    try {
+      const r = await api.sendDm(userId, p.text);
+      setPending((l) => l.filter((x) => x.id !== p.id));
+      setErr(null);
+      if (r && r.conversation_id && r.conversation_id !== convId) setConvId(r.conversation_id);
+      await loadMessages(r?.conversation_id || convId);
+    } catch (e) {
+      setPending((l) => l.map((x) => (x.id === p.id ? { ...x, failed: true } : x)));
+      setErr(userMessage(e));
+      scrollDown();
+      loadStatus();
+    }
+  }
 
   function insertEmoji(emoji) {
     const c = caretRef.current;
@@ -146,22 +196,26 @@ export function DmChatScreen({ userId }) {
   async function send() {
     const text = input.trim();
     if (!text || sending) return;
-    setSending(true);
     setErr(null);
+    if (!editing) {
+      // Mesaj hemen 🕓 ile görünür, yazma alanı boşalır
+      const p = { id: Date.now() + Math.random(), text, failed: false };
+      setPending((l) => [...l, p]);
+      setInput("");
+      caretRef.current = null;
+      scrollDown();
+      deliver(p);
+      return;
+    }
+    setSending(true);
     try {
-      if (editing) {
-        await api.editDm(editing.id, text);
-        setEditing(null);
-      } else {
-        const r = await api.sendDm(userId, text);
-        if (r && r.conversation_id && r.conversation_id !== convId) setConvId(r.conversation_id);
-      }
+      await api.editDm(editing.id, text);
+      setEditing(null);
       setInput("");
       caretRef.current = null;
       await loadMessages(convId);
     } catch (e) {
       setErr(userMessage(e));
-      loadStatus();
     } finally {
       setSending(false);
     }
@@ -221,11 +275,12 @@ export function DmChatScreen({ userId }) {
     <div class="chat">
       <${TopBar} title=${"✉️ " + name} backLabel="←" onBack=${() => navigate("/mesajlar")}
         sub=${s ? (s.is_staff ? "Yönetim • Profil için dokun" : "Profil ve engelleme için dokun") : ""}
-        onSubClick=${() => setShowProfile(true)} />
+        onSubClick=${() => setShowProfile(true)}
+        right=${convId && html`<button class="btn ghost" style="font-size:24px;font-weight:800" onClick=${() => setShowHide(true)}>⋮</button>`} />
 
       <div class="messages" ref=${listRef}>
         ${loading ? html`<${Spinner} />`
-          : messages.length === 0 ? html`<div class="center muted" style="flex:1">${s && !s.reason ? "Henüz mesaj yok. İlk mesajı sen yaz! 👋" : "Henüz mesaj yok."}</div>`
+          : messages.length === 0 && pending.length === 0 ? html`<div class="center muted" style="flex:1">${s && !s.reason ? "Henüz mesaj yok. İlk mesajı sen yaz! 👋" : "Henüz mesaj yok."}</div>`
           : messages.map((m) => {
             const mine = m.sender_id === myId;
             const counts = api.dmReactionCounts(m);
@@ -233,9 +288,10 @@ export function DmChatScreen({ userId }) {
             const big = n !== null && n >= 1 && n <= 3;
             return html`
               <div class=${"mwrap" + (mine ? " mine" : "")} id=${"d" + m.id} key=${m.id}>
-                <div class="bubble" ...${longPress(() => setMenuFor(m))}>
-                  <div class=${"txt" + (big ? " big" : "")}>${m.content}</div>
-                  <div class="time">${m.edited_at ? "düzenlendi • " : ""}${chatTime(m.created_at)}</div>
+                <div class="bubble" ...${longPress(() => { if (!(m.deleted && mine)) setMenuFor(m); })}>
+                  <div class=${"txt" + (big && !m.deleted ? " big" : "") + (m.deleted ? " deleted" : "")}>${m.content}</div>
+                  <div class="time">${m.edited_at && !m.deleted ? "düzenlendi • " : ""}${chatTime(m.created_at)}
+                    ${mine && !m.deleted && html` <${Ticks} status=${m.status} />`}</div>
                 </div>
                 ${counts.length > 0 && html`
                   <div class="reacts" style=${(m.reactions || []).some((r) => r.user_id === myId) ? "border-color:#3D8BFF" : ""}>
@@ -243,6 +299,14 @@ export function DmChatScreen({ userId }) {
                   </div>`}
               </div>`;
           })}
+        ${pending.map((p) => html`
+          <div class="mwrap mine" key=${"p" + p.id}>
+            <div class=${"bubble pending" + (p.failed ? " failed" : "")} onClick=${() => p.failed && deliver(p)}>
+              <div class="txt">${p.text}</div>
+              <div class="time">${p.failed ? "❗ Gönderilemedi • Tekrar denemek için dokun" : "🕓 Gönderiliyor…"}</div>
+            </div>
+            ${p.failed && html`<button class="btn ghost small" onClick=${() => setPending((l) => l.filter((x) => x.id !== p.id))}>Vazgeç</button>`}
+          </div>`)}
       </div>
 
       ${err && html`<div class="small" style="color:var(--red-soft);padding:4px 16px">${err}</div>`}
@@ -256,6 +320,10 @@ export function DmChatScreen({ userId }) {
         return html`
           <${Modal} title=${mine ? "Mesajın" : name} center=${false} onClose=${close}>
             <div class="muted" style="margin-bottom:6px;max-height:4.5em;overflow:hidden">${m.content}</div>
+            ${m.deleted ? html`
+              <div class="soft small" style="margin-bottom:6px">Gönderen bu mesajı sildi. Uygunsuz bir şey yazdıysa şikayet edebilirsin; yönetim silinen mesajın aslını görebilir.</div>
+              <button class="list-btn" style="color:#FFB020" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>
+              <button class="list-btn muted" onClick=${close}>Vazgeç</button>` : html`
             <div class="emoji-row">
               ${[...(my && !api.REACTIONS.includes(my) ? [my] : []), ...api.REACTIONS].slice(0, 6).map((e) => html`
                 <button key=${e} class=${my === e ? "on" : ""} onClick=${() => { close(); react(m, e); }}>${e}</button>`)}
@@ -267,7 +335,7 @@ export function DmChatScreen({ userId }) {
             ${mine
               ? html`<button class="list-btn" style="color:var(--red-soft)" onClick=${() => { setDeleteFor(m); close(); }}>🗑  Sil</button>`
               : html`<button class="list-btn" style="color:#FFB020" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>`}
-            <button class="list-btn muted" onClick=${close}>Vazgeç</button>
+            <button class="list-btn muted" onClick=${close}>Vazgeç</button>`}
           </${Modal}>`;
       })()}
 
@@ -277,7 +345,7 @@ export function DmChatScreen({ userId }) {
         </${Modal}>`}
 
       ${deleteFor && html`
-        <${Modal} title="Mesaj silinsin mi?" onClose=${() => setDeleteFor(null)}
+        <${Modal} title="🗑 Mesaj silinsin mi?" onClose=${() => setDeleteFor(null)}
           actions=${[
             html`<button class="btn outline" onClick=${() => setDeleteFor(null)}>Vazgeç</button>`,
             html`<button class="btn red" onClick=${async () => {
@@ -286,12 +354,19 @@ export function DmChatScreen({ userId }) {
               try { await api.deleteDm(m.id); loadMessages(); } catch (e) { setErr(userMessage(e)); }
             }}>Sil</button>`,
           ]}>
-          <div>Mesaj iki taraftan da silinir.</div>
+          <div style="font-size:16px">Mesaj iki taraftan da kaldırılacak; yerinde "🚫 Bu mesaj silindi" yazacak.</div>
+          <div class="soft" style="margin-top:10px">Bir şikayet olursa yönetim, silinen mesajı 30 gün boyunca inceleyebilir.</div>
         </${Modal}>`}
 
       ${reportFor && html`<${ReportDialog} msg=${reportFor} label=${name} title="🚩 Özel mesajı şikayet et"
           send=${api.reportDm} note="Sadece bu mesaj yönetime gönderilir; konuşmanın geri kalanını kimse göremez."
           onClose=${() => setReportFor(null)} onError=${setErr} />`}
+
+      ${showHide && html`<${HideModal} name=${name} onClose=${() => setShowHide(false)}
+          onConfirm=${async () => {
+            setShowHide(false);
+            try { await api.hideDmConversation(convId); navigate("/mesajlar"); } catch (e) { setErr(userMessage(e)); }
+          }} />`}
 
       ${showProfile && html`<${MemberProfileModal} userId=${userId}
           onClose=${() => { setShowProfile(false); loadStatus(); }}

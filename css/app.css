@@ -335,3 +335,30 @@ textarea.input { resize: none; }
 .dm-new { color: var(--blue-2); font-weight: 700; }
 .dm-badge { background: var(--blue-2); color: #fff; border-radius: 12px; min-width: 24px; height: 24px; padding: 0 6px;
   display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+
+/* ---- 1.1.5: tikler, silinmiş, bekleyen mesaj ---- */
+.ticks { margin-left: 4px; font-weight: 800; letter-spacing: -2px; color: rgba(255,255,255,.55); }
+.ticks.read { color: #5CF2FF; text-shadow: 0 0 6px rgba(92,242,255,.6); }
+.bubble .txt.deleted { font-style: italic; opacity: .6; font-size: 16px; }
+.bubble.pending { opacity: .75; }
+.bubble.failed { background: #5A1E1E !important; opacity: 1; cursor: pointer; }
+
+/* ---- 1.1.5: sade Ayarlar ---- */
+.set-wrap { padding: 4px 14px calc(var(--safe-bottom) + 24px); }
+.set-sec { font-size: 13px; font-weight: 700; color: #8A9BB0; letter-spacing: .6px; padding: 16px 8px 6px; }
+.set-grp { background: var(--card); border-radius: 16px; overflow: hidden; }
+.set-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 54px; border-bottom: 1px solid #1F2C3B; }
+.set-row:last-child { border-bottom: 0; }
+.set-row:active { background: var(--card-2); }
+.set-ic { width: 34px; height: 34px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800; color: #fff; }
+.set-t { flex: 1; min-width: 0; }
+.set-t b { display: block; font-size: 16px; font-weight: 600; }
+.set-t small { display: block; font-size: 13px; color: #8A9BB0; }
+.set-v { font-size: 14px; color: #8A9BB0; white-space: nowrap; }
+.set-v.g { color: #4ADE80; } .set-v.o { color: #FBBF24; }
+.set-ch { color: #4B5D73; font-size: 22px; }
+.set-foot { font-size: 12px; color: #6B7C90; padding: 10px 8px; }
+.set-warn { display: block; width: 100%; text-align: left; margin-top: 8px; border-radius: 14px; padding: 12px; font-size: 14px;
+  background: #3A2410; border: 1px solid #B26A00; color: #FDE7C7; }
+.set-warn.red { background: #5A1E1E; border-color: #FF6B6B; color: #fff; }
+.set-warn.blue { background: #13284A; border-color: var(--blue); color: #fff; cursor: pointer; font-weight: 700; }

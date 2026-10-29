@@ -22,6 +22,11 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
   // Bildirime dokunulunca uygulama zaten açıksa ilgili ekrana git
   navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data?.type === "dyb-live") {
+      // Uygulama açıkken bildirim geldi: açık ekran kendini yenilesin
+      window.dispatchEvent(new CustomEvent("dyb-live", { detail: e.data.kind || "chat" }));
+      return;
+    }
     if (e.data?.type === "dyb-open" && e.data.url) {
       const u = new URL(e.data.url);
       if (u.hash) location.hash = u.hash;

@@ -508,3 +508,20 @@ export function dmReactionCounts(m) {
   });
   return order.map((e) => [e, count[e]]).sort((a, b) => b[1] - a[1]);
 }
+export const markDmDelivered = () => rpc("mark_dm_delivered");
+export const hideDmConversation = (convId) => rpc("hide_dm_conversation", { p_conv: convId });
+export const setReadReceipts = (on) => rpc("set_read_receipts", { p_on: on });
+
+/** Her oda için okunmamış mesaj sayısı: { trafik: 4, ... } (en fazla 99) */
+export async function roomUnreadCounts(rooms) {
+  const seen = {};
+  (rooms || []).forEach((r) => {
+    if (!r.last_message_id) return;
+    if (isNaN(lastSeenId(r.id))) markSeen(r.id, r.last_message_id);   // ilk kez: eskiler sayılmasın
+    seen[r.id] = lastSeenId(r.id);
+  });
+  const rows = await rpc("room_unread_counts", { p_seen: seen });
+  const out = {};
+  (rows || []).forEach((x) => { out[x.room_id] = x.unread; });
+  return out;
+}
