@@ -10,6 +10,7 @@ import { startUsageTracking } from "./usage.js";
 import { LoginScreen, RegisterScreen, UsernameScreen, BannedScreen, NewPasswordScreen } from "./screens/auth.js";
 import { ProfileScreen } from "./screens/profile.js";
 import { MenuScreen } from "./screens/menu.js";
+import { DmInboxScreen, DmChatScreen } from "./screens/dm.js";
 import { ChatScreen } from "./screens/chat.js";
 import { MapScreen } from "./screens/map.js";
 import { InvitesScreen } from "./screens/invites.js";
@@ -154,6 +155,11 @@ function App() {
     screen = html`<${ChatScreen} key=${roomId} roomId=${roomId} focusId=${parseInt(query.get("m") || "", 10) || null} />`;
   } else if (path === "/harita") {
     screen = html`<${MapScreen} focusRadarId=${query.get("radar")} openReport=${query.get("bildir") === "1"} />`;
+  } else if (path === "/mesajlar") {
+    screen = html`<${DmInboxScreen} />`;
+  } else if (path.startsWith("/mesaj/")) {
+    const uid = decodeURIComponent(path.slice(7));
+    screen = html`<${DmChatScreen} key=${uid} userId=${uid} />`;
   } else if (path === "/davetler") {
     screen = html`<${InvitesScreen} />`;
   } else if (path === "/ayarlar") {

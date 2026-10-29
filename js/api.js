@@ -482,3 +482,29 @@ export const setNotificationPrefs = (p) => rpc("set_notification_prefs", {
 });
 
 export const usagePing = (seconds) => rpc("usage_ping", { p_seconds: seconds });
+
+// ---------- Özel mesaj ----------
+export const myConversations = () => rpc("my_conversations");
+export const dmUnreadTotal = () => rpc("dm_unread_total");
+export const dmStatus = (userId) => rpc("dm_status", { p_user: userId });
+export const dmMessages = (convId) => rpc("dm_messages", { p_conv: convId, p_limit: 200 });
+export const markDmRead = (convId) => rpc("mark_dm_read", { p_conv: convId });
+export const sendDm = (to, text) => rpc("send_dm", { p_to: to, p_content: text });
+export const editDm = (id, text) => rpc("edit_dm", { p_id: id, p_content: text });
+export const deleteDm = (id) => rpc("delete_dm", { p_id: id });
+export const reactDm = (id, emoji) => rpc("react_dm", { p_id: id, p_emoji: emoji });
+export const reportDm = (id, reason, note) => rpc("report_dm", { p_id: id, p_reason: reason, p_note: note || "" });
+export const myDmSettings = () => rpc("my_dm_settings");
+export const setDmOpen = (open) => rpc("set_dm_open", { p_open: open });
+export const setDmNotify = (off) => rpc("set_dm_notify", { p_off: off });
+export const blockUser = (userId, block) => rpc("block_user", { p_user: userId, p_block: block });
+/** Özel mesaj tepki sayıları: [["👍", 2], ...] */
+export function dmReactionCounts(m) {
+  const count = {};
+  const order = [];
+  (m.reactions || []).forEach((r) => {
+    if (!(r.emoji in count)) { order.push(r.emoji); count[r.emoji] = 0; }
+    count[r.emoji]++;
+  });
+  return order.map((e) => [e, count[e]]).sort((a, b) => b[1] - a[1]);
+}

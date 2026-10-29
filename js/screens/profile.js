@@ -113,6 +113,7 @@ export function ProfileScreen() {
             ${invited.length > 0 && html`<div class="soft small" style="margin-top:6px">${invited.map((x) => "@" + x).join("  ")}</div>`}
           </div>
 
+          <button class="btn block big" style="background:#7B4DDB" onClick=${() => navigate("/davetler")}>👥 Davetlerim / Davet kodu oluştur</button>
           <button class="btn block big" onClick=${() => setModal("rename")}>✏️ Kullanıcı adını değiştir</button>
           <button class="btn block big teal" onClick=${() => setModal("password")}>🔑 Şifremi değiştir</button>
           <button class="btn block big red" onClick=${() => setModal("logout")}>🚪 Çıkış yap</button>
@@ -288,10 +289,26 @@ export function LeaderboardModal({ onClose }) {
 }
 
 /** Sohbette isme dokununca açılan üye profili (e-posta görünmez) */
-export function MemberProfileModal({ userId, onClose }) {
+export function MemberProfileModal({ userId, onClose, onMessage }) {
   const [p, setP] = useState(null);
   const [err, setErr] = useState(null);
+  const [dm, setDm] = useState(null);          // özel mesaj durumu
+  const [dmBusy, setDmBusy] = useState(false);
+  const isMe = userId === api.myId();
   useEffect(() => { api.publicProfile(userId).then(setP).catch((e) => setErr(userMessage(e))); }, [userId]);
+  useEffect(() => { if (!isMe) api.dmStatus(userId).then(setDm).catch(() => {}); }, [userId]);
+  const openDm = () => { if (onMessage) onMessage(userId); else { onClose(); navigate("/mesaj/" + userId); } };
+  async function toggleBlock() {
+    setDmBusy(true);
+    try {
+      await api.blockUser(userId, !dm.blocked_by_me);
+      toast(dm.blocked_by_me ? "Engel kaldırıldı" : "Engellendi. Artık sana özel mesaj yazamaz.", 3500);
+      setDm(await api.dmStatus(userId));
+    } catch (e) {
+      toast(userMessage(e), 4000);
+    }
+    setDmBusy(false);
+  }
   const r = rankOf(p);
   const roomsAdmin = (p?.room_admin_of || []).filter(Boolean);
   return html`
@@ -307,7 +324,16 @@ export function MemberProfileModal({ userId, onClose }) {
         ${p.bio && html`<div style="margin-top:8px;font-size:17px">📝 ${p.bio}</div>`}
         <div class="soft small" style="margin-top:8px">Üyelik: ${dateText(p.created_at)}</div>
         ${roomsAdmin.length > 0 && html`<div class="soft small">🔰 Oda yöneticisi: ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
-        <div class="soft small">💬 ${p.message_count} mesaj • 📍 ${p.radar_count} radar • ✅ ${p.confirmed_count} onaylı</div>`}
+        <div class="soft small">💬 ${p.message_count} mesaj • 📍 ${p.radar_count} radar • ✅ ${p.confirmed_count} onaylı</div>
+        ${dm && html`
+          <div style="margin-top:12px">
+            ${(!dm.reason || dm.conversation_id) && html`<button class="btn block big" onClick=${openDm}>
+              ${dm.conversation_id ? "✉️ Özel sohbeti aç" : "✉️ Mesaj gönder"}</button>`}
+            ${dm.reason && html`<div style="color:#FFB020;margin-top:8px;font-size:16px">🔒 ${dm.reason}</div>`}
+            ${!dm.is_staff && html`<button class="btn block ghost" disabled=${dmBusy} onClick=${toggleBlock}
+              style=${`margin-top:6px;color:${dm.blocked_by_me ? "#3DDC84" : "#FF8A80"}`}>
+              ${dm.blocked_by_me ? "✅ Engeli kaldır" : "🚫 Özel mesaj için engelle"}</button>`}
+          </div>`}`}
     </${Modal}>`;
 }
 

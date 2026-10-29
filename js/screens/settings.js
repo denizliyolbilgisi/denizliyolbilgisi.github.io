@@ -1,5 +1,5 @@
 // Ayarlarım: bildirim izni, sohbet / radar sessize alma, oda bazlı bildirim (ayarlar sunucuda tutulur)
-import { html, useState, useEffect, navigate, userMessage, isStillActive, remainingText, isStandalone, toast } from "../lib.js";
+import { html, useState, useEffect, navigate, userMessage, isStillActive, remainingText, isStandalone, toast, roleBadge } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, Switch, useInterval } from "../ui.js";
 import { APP_VERSION } from "../config.js";
@@ -105,6 +105,7 @@ export function SettingsScreen() {
       <div class="content">
         ${permCard}
         ${err && html`<div class="msg err">${err}</div>`}
+        <${DmSettingsCard} />
         ${!prefs ? html`<${Spinner} />` : html`
           <${Category} kind="chat" title="💬 Sohbet bildirimleri" subtitle="Sohbet odalarına yeni mesaj gelince" />
           <div class="card">
@@ -119,7 +120,7 @@ export function SettingsScreen() {
                 }} />`)}
             <div class="soft small" style="margin-top:8px">📣 Biri seni @etiketlediğinde ya da mesajına yanıt verdiğinde, oda kapalı olsa bile bildirim gelir.</div>
           </div>
-          <${Category} kind="radar" title="🚨 Radar bildirimleri" subtitle="Yeni sabit ya da mobil radar bildirilince" />
+          <${Category} kind="radar" title="🚨 Radar bildirimleri" subtitle="Radar, kaza, yavaşlama ya da buzlanma bildirilince" />
         `}
         <div class="soft small">Bu ayarlar hesabına kaydedilir. Haritadaki yaklaşma uyarısı (bip sesi) bu ayarlardan etkilenmez.</div>
         <div class="muted small" style="text-align:center">DYB iPhone sürümü ${APP_VERSION}</div>
@@ -136,6 +137,56 @@ export function SettingsScreen() {
                 setSilenceFor(null);
               }}>${label}</button>`)}
           <button class="list-btn muted" onClick=${() => setSilenceFor(null)}>Vazgeç</button>
+        </${Modal}>`}
+    </div>`;
+}
+
+/** Özel mesajlarım: aç / kapat (sunucuda kayıt altına alınır), bildirim, engellediklerim */
+function DmSettingsCard() {
+  const [st, setSt] = useState(null);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const load = () => api.myDmSettings().then((x) => { setSt(x); setErr(null); }).catch((e) => setErr(userMessage(e)));
+  useEffect(() => { load(); }, []);
+
+  async function run(fn) {
+    setBusy(true);
+    try { await fn(); await load(); } catch (e) { setErr(userMessage(e)); }
+    setBusy(false);
+  }
+
+  if (!st) return html`<div class="card"><h2>✉️ Özel mesajlar</h2><div class=${err ? "msg err" : "soft"}>${err || "Yükleniyor…"}</div></div>`;
+  return html`
+    <div class="card" style=${st.dm_open ? "" : "border-color:#B26A00"}>
+      <h2>✉️ Özel mesajlar</h2>
+      <div style=${`font-size:16px;color:${st.dm_open ? "#8BE0A4" : "#FFC27A"}`}>
+        ${st.dm_open ? "🔓 Açık: üyeler sana özel mesaj yazabilir." : "🔒 Kapalı: sana kimse yazamaz. Sadece kurucu ve yöneticiler gerektiğinde ulaşabilir."}
+      </div>
+      <${Switch} label="Bana özel mesaj yazılabilsin" checked=${st.dm_open}
+        onChange=${(on) => { if (busy) return; if (on) run(() => api.setDmOpen(true)); else setConfirmClose(true); }} />
+      ${st.dm_changed_at && html`<div class="soft small">Son değişiklik: ${new Date(st.dm_changed_at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}</div>`}
+      <${Switch} label="🔔 Özel mesaj bildirimleri" checked=${!st.dm_notify_off}
+        onChange=${(on) => run(() => api.setDmNotify(!on))} />
+      <div class="bold" style="margin-top:10px;font-size:18px">🚫 Engellediklerim</div>
+      ${(st.blocks || []).length === 0
+        ? html`<div class="soft small">Kimseyi engellemedin. Bir üyeyi engellemek için sohbette adına dokun → "Özel mesaj için engelle".</div>`
+        : st.blocks.map((b) => html`
+          <div class="row" key=${b.user_id} style="margin-top:6px">
+            <span class="grow" style="font-size:17px">@${b.username || ""} ${roleBadge(b.role)}</span>
+            <button class="btn outline" disabled=${busy} onClick=${() => run(() => api.blockUser(b.user_id, false))}>Engeli kaldır</button>
+          </div>`)}
+      ${err && html`<div class="msg err">${err}</div>`}
+
+      ${confirmClose && html`
+        <${Modal} title="🔒 Özel mesajlar kapansın mı?" onClose=${() => setConfirmClose(false)}
+          actions=${[
+            html`<button class="btn outline" onClick=${() => setConfirmClose(false)}>Vazgeç</button>`,
+            html`<button class="btn orange" onClick=${() => { setConfirmClose(false); run(() => api.setDmOpen(false)); }}>Kapat</button>`,
+          ]}>
+          <div style="font-size:16px">Kapatınca üyeler sana özel mesaj yazamaz; yazmaya çalışan "Bu kullanıcı özel mesaj yolunu kapatmıştır" uyarısını görür.
+            Kurucu ve yöneticiler yine de yazabilir. Eski konuşmaların silinmez. İstediğin zaman tekrar açabilirsin.</div>
         </${Modal}>`}
     </div>`;
 }

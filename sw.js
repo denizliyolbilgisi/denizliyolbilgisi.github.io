@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.1.3";
+const VERSION = "dyb-1.1.4";
 
 const SHELL = [
   "./",
@@ -17,6 +17,7 @@ const SHELL = [
   "./js/screens/auth.js",
   "./js/screens/menu.js",
   "./js/screens/chat.js",
+  "./js/screens/dm.js",
   "./js/screens/map.js",
   "./js/screens/invites.js",
   "./js/screens/settings.js",
@@ -88,6 +89,9 @@ self.addEventListener("push", (event) => {
   } else if (type === "yardim") {
     url = "./#/davetler";                       // güncelleme yapamayan davetli
     tag = "yardim";
+  } else if (type === "dm") {
+    url = d.sender_id ? `./#/mesaj/${encodeURIComponent(d.sender_id)}` : "./#/mesajlar";   // özel mesaj
+    tag = "dm-" + (d.sender_id || "");
   } else if (type === "sifre") {
     url = "./#/yonetim?tab=sifre";              // şifre yenileme talebi
     tag = "sifre";

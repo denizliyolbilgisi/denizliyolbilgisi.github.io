@@ -599,7 +599,7 @@ function ClampText({ text, color }) {
 }
 
 /** Emoji paneli (kategoriler, arama, son kullanılanlar, ten rengi). Dosyalar vendor/emoji içinde. */
-function EmojiPanel({ onPick, height = 300 }) {
+export function EmojiPanel({ onPick, height = 300 }) {
   const ref = useRef(null);
   const pickRef = useRef(onPick);
   pickRef.current = onPick;
@@ -670,19 +670,19 @@ function rulesTextFor(room, isTraffic) {
 }
 
 // ---------------------------------------------------------------------------
-function ReportDialog({ msg, label, onClose, onError }) {
+export function ReportDialog({ msg, label, onClose, onError, send = api.reportMessage, title = "🚩 Mesajı şikayet et", note: hint }) {
   const [reason, setReason] = useState("kufur");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const ok = reason !== "diger" || note.trim().length >= 3;
   return html`
-    <${Modal} title="🚩 Mesajı şikayet et" onClose=${() => !busy && onClose()}
+    <${Modal} title=${title} onClose=${() => !busy && onClose()}
       actions=${[
         html`<button class="btn outline" disabled=${busy} onClick=${onClose}>Vazgeç</button>`,
         html`<button class="btn" disabled=${!ok || busy} onClick=${async () => {
           setBusy(true);
           try {
-            await api.reportMessage(msg.id, reason, note.trim());
+            await send(msg.id, reason, note.trim());
             toast("Şikayetin yönetime iletildi. Teşekkürler!", 4000);
           } catch (e) {
             onError(userMessage(e));
@@ -699,7 +699,7 @@ function ReportDialog({ msg, label, onClose, onError }) {
         </label>`)}
       <textarea class="input" rows="2" maxlength="300" placeholder=${reason === "diger" ? "Açıklama (zorunlu)" : "Açıklama (isteğe bağlı)"}
         value=${note} onInput=${(e) => setNote(e.target.value)}></textarea>
-      <div class="muted small" style="margin-top:6px">Şikayetin sadece yönetime gider. Mesajın sahibi kimin şikayet ettiğini görmez.</div>
+      <div class="muted small" style="margin-top:6px">${hint || "Şikayetin sadece yönetime gider. Mesajın sahibi kimin şikayet ettiğini görmez."}</div>
     </${Modal}>`;
 }
 

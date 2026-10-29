@@ -41,6 +41,7 @@ export function MenuScreen({ onBanned }) {
   const [radars, setRadars] = useState(null);
   const [radarError, setRadarError] = useState(false);
   const [openReports, setOpenReports] = useState(0);
+  const [dmUnread, setDmUnread] = useState(0);         // okunmamış özel mesaj
   const [announcement, setAnnouncement] = useState({ text: "", warn: false });
   const [tick, setTick] = useState(0);
   const [rankUp, setRankUp] = useState(null);   // { icon, name }
@@ -101,6 +102,7 @@ export function MenuScreen({ onBanned }) {
         ? { text: only, warn: api.cfgText("announcement_ios_level") === "warning" }
         : { text: target === "android" ? "" : api.cfgText("announcement"), warn: api.cfgText("announcement_level") === "warning" });
     }).catch(() => {});
+    api.dmUnreadTotal().then((n) => setDmUnread(n || 0)).catch(() => {});
     setPushPerm(permission());
   }
 
@@ -189,7 +191,8 @@ export function MenuScreen({ onBanned }) {
       <div style="height:84px"></div>
       <nav class="bottom-nav">
         <button class="on"><span class="i">🏠</span>Ana Sayfa</button>
-        <button onClick=${() => navigate("/davetler")}><span class="i">👥</span>Davetler</button>
+        <button onClick=${() => navigate("/mesajlar")}><span class="i">✉️</span>Mesajlar
+          ${dmUnread > 0 && html`<span class="count">${dmUnread > 9 ? "9+" : dmUnread}</span>`}</button>
         ${rank >= 2 && html`<button onClick=${() => navigate("/yonetim")}><span class="i">🛡</span>Yönetim
           ${openReports > 0 && html`<span class="count">${openReports > 9 ? "9+" : openReports}</span>`}</button>`}
         <button onClick=${() => navigate("/ayarlar")}><span class="i">⚙️</span>Ayarlar</button>
