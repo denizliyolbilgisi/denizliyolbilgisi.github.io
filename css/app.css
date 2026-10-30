@@ -459,9 +459,10 @@ textarea.input { resize: none; }
 .ecz-adres { color: var(--soft); font-size: 15px; margin-top: 4px; }
 .ecz-saat { color: var(--green-text); font-size: 13px; font-weight: 600; margin-top: 3px; }
 .ecz-btns { display: flex; gap: 8px; margin-top: 10px; }
-.ecz-btns .btn { flex: 1; text-decoration: none; justify-content: center; padding: 11px 8px; font-size: 16px; }
+.ecz-btns .btn { flex: 1; min-width: 0; text-decoration: none; justify-content: center; padding: 11px 4px; font-size: 15px; white-space: nowrap; gap: 4px; }
 .ecz-ara { background: #16A34A; }
 .ecz-map { background: #2563EB; }
+.ecz-yol { background: #EA580C; }
 .ecz-btns .off { background: var(--card-2); color: var(--muted); }
 .ecz-tel { color: var(--muted); font-size: 13px; margin-top: 6px; text-align: center; }
 .ecz-kaynak { color: var(--muted); font-size: 12px; text-align: center; margin: 16px 0 6px; }

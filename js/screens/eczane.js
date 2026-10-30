@@ -21,6 +21,13 @@ export function telYaz(t) {
   return /^0\d{10}$/.test(d) ? `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7, 9)} ${d.slice(9)}` : (t || "");
 }
 const telHref = (t) => "tel:" + (t || "").replace(/[^\d+]/g, "");
+/** 🧭 Yol tarifi: iPhone'da Apple Haritalar, diğerlerinde Google Haritalar navigasyonu açar */
+export function yolHref(e) {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return ios
+    ? `https://maps.apple.com/?daddr=${e.lat},${e.lng}&dirflg=d`
+    : `https://www.google.com/maps/dir/?api=1&destination=${e.lat},${e.lng}&travelmode=driving`;
+}
 function saatAraligi(b, e) {
   if (!b || !e) return null;
   const f = (x) => new Date(x).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", "").replace(/\//g, ".");
@@ -52,7 +59,8 @@ function EczaneKart({ e, ilceGoster }) {
           ? html`<a class="btn ecz-ara" href=${telHref(e.telefon)}>📞 Ara</a>`
           : html`<span class="btn ecz-ara off">📞 Telefon yok</span>`}
         ${e.lat != null && e.lng != null
-          ? html`<button class="btn ecz-map" onClick=${() => navigate("/eczane-harita?id=" + e.id)}>🗺 Haritada</button>`
+          ? html`<button class="btn ecz-map" onClick=${() => navigate("/eczane-harita?id=" + e.id)}>🗺 Haritada</button>
+                 <a class="btn ecz-yol" href=${yolHref(e)} target="_blank" rel="noopener">🧭 Yol Tarifi</a>`
           : html`<span class="btn ecz-map off">🗺 Konum yok</span>`}
       </div>
       ${e.telefon && html`<div class="ecz-tel">${telYaz(e.telefon)}</div>`}
@@ -198,7 +206,11 @@ export function EczaneMapScreen({ focusId }) {
               <button class="ecz-x" onClick=${() => setSel(null)}>✕</button>
             </div>
             ${sel.adres && html`<div class="ecz-adres">📍 ${sel.adres}</div>`}
-            ${sel.telefon && html`<div class="ecz-btns"><a class="btn ecz-ara" href=${telHref(sel.telefon)}>📞 Ara • ${telYaz(sel.telefon)}</a></div>`}
+            <div class="ecz-btns">
+              ${sel.telefon && html`<a class="btn ecz-ara" href=${telHref(sel.telefon)}>📞 Ara</a>`}
+              <a class="btn ecz-yol" href=${yolHref(sel)} target="_blank" rel="noopener">🧭 Yol Tarifi</a>
+            </div>
+            ${sel.telefon && html`<div class="ecz-tel">${telYaz(sel.telefon)}</div>`}
           </div>`}
       </div>
     </div>`;
