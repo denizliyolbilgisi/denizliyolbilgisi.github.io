@@ -362,3 +362,15 @@ textarea.input { resize: none; }
   background: #3A2410; border: 1px solid #B26A00; color: #FDE7C7; }
 .set-warn.red { background: #5A1E1E; border-color: #FF6B6B; color: #fff; }
 .set-warn.blue { background: #13284A; border-color: var(--blue); color: #fff; cursor: pointer; font-weight: 700; }
+
+/* ---- 1.1.6: gün ayracı, filigran ---- */
+.day-chip { display: flex; justify-content: center; margin: 6px 0; }
+.day-chip span { background: rgba(0,0,0,.35); color: #CDD8E6; font-size: 13px; font-weight: 600; border-radius: 12px; padding: 4px 12px; }
+.watermark { position: absolute; inset: -40px; z-index: 5; pointer-events: none; overflow: hidden;
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 46px 34px; padding: 20px;
+  transform: rotate(-24deg); opacity: .08; color: #fff; font-size: 14px; font-weight: 700; white-space: nowrap; user-select: none; }
+.chat { position: relative; overflow: hidden; }
+.dm-search { padding: 8px 12px 0; }
+.dm-search input { width: 100%; box-sizing: border-box; }
+.member-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.06); cursor: pointer; }
+.member-row .muted { font-size: 13px; }

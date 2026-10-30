@@ -24,16 +24,28 @@ function flush(stillVisible) {
   });
 }
 
+/** Çevrimiçi / son görülme */
+function presence(online, retry = 3) {
+  if (!api.myId()) {
+    // Giriş henüz bitmediyse birkaç saniye sonra tekrar dene
+    if (online && retry > 0) setTimeout(() => { if (document.visibilityState === "visible") presence(true, retry - 1); }, 5000);
+    return;
+  }
+  api.presence(online).catch(() => {});
+}
+
 function onVisible() {
   if (!visibleSince) visibleSince = Date.now();
   clearInterval(timer);
-  timer = setInterval(() => flush(true), INTERVAL_MS);
+  presence(true);
+  timer = setInterval(() => { flush(true); presence(true); }, INTERVAL_MS);
 }
 
 function onHidden() {
   clearInterval(timer);
   timer = null;
   flush(false);
+  presence(false);
 }
 
 export function startUsageTracking() {

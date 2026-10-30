@@ -525,3 +525,10 @@ export async function roomUnreadCounts(rooms) {
   (rows || []).forEach((x) => { out[x.room_id] = x.unread; });
   return out;
 }
+
+// ---------- 1.1.6: arama, yazıyor, çevrimiçi ----------
+export const searchMembers = (q) => rpc("search_members", { p_query: q });
+export const setTyping = (key) => rpc("set_typing", { p_key: key });
+export const typingList = async (key) => ((await rpc("typing_list", { p_key: key })) || []).map((x) => x.username).filter(Boolean);
+export const presence = (online) => rpc("presence", { p_online: online });
+export const setShowOnline = (on) => rpc("set_show_online", { p_on: on });

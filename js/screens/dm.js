@@ -1,5 +1,5 @@
 // Özel mesajlar: gelen kutusu ve birebir sohbet
-import { html, useState, useEffect, useRef, navigate, userMessage, chatTime, roleBadge, toast, copyText } from "../lib.js";
+import { html, useState, useEffect, useRef, navigate, userMessage, chatTime, roleBadge, toast, copyText, dayKey, dayLabel, typingText, presenceText } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume, useLive } from "../ui.js";
 import { MemberProfileModal } from "./profile.js";
@@ -25,6 +25,18 @@ export function DmInboxScreen() {
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
   const [hideFor, setHideFor] = useState(null);   // "sohbeti benden sil"
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState(null);         // üye arama sonuçları
+
+  useEffect(() => {
+    const t = q.replace(/^@/, "").trim();
+    if (t.length < 2) { setHits(null); return; }
+    let iptal = false;
+    const id = setTimeout(() => {
+      api.searchMembers(t).then((r) => { if (!iptal) setHits(r); }).catch(() => { if (!iptal) setHits([]); });
+    }, 300);
+    return () => { iptal = true; clearTimeout(id); };
+  }, [q]);
 
   async function load() {
     try {
@@ -44,7 +56,23 @@ export function DmInboxScreen() {
   return html`
     <div class="screen">
       <${TopBar} title="✉️ Mesajlar" sub="Özel sohbetlerin" onBack=${() => navigate("/menu")} />
-      ${list === null ? html`<${Spinner} />`
+      <div class="dm-search">
+        <input class="input" type="search" placeholder="🔍 Üye ara (en az 2 harf)" value=${q}
+          autocapitalize="off" autocomplete="off" onInput=${(e) => setQ(e.target.value)} />
+      </div>
+      ${hits !== null ? html`
+        <div class="dm-list">
+          ${hits.length === 0 ? html`<div class="soft" style="padding:16px">Üye bulunamadı.</div>`
+            : hits.map((h) => html`
+              <button class="dm-row" key=${h.user_id} onClick=${() => navigate("/mesaj/" + h.user_id)}>
+                <${Avatar} name=${h.username} id=${h.user_id} />
+                <div class="grow" style="min-width:0">
+                  <b class="dm-name">@${h.username} ${roleBadge(h.role)}</b>
+                  <div class="muted small">${h.online ? "🟢 çevrimiçi" : ""}${h.dm_open === false ? (h.online ? " • " : "") + "🔒 Özel mesajları kapalı" : ""}</div>
+                </div>
+              </button>`)}
+        </div>`
+      : list === null ? html`<${Spinner} />`
         : list.length === 0 ? html`
           <div class="content" style="text-align:center">
             <div style="font-size:56px">✉️</div>
@@ -125,6 +153,8 @@ export function DmChatScreen({ userId }) {
   const inputRef = useRef(null);
   const caretRef = useRef(null);
   const lastIdRef = useRef(null);
+  const lastTypingRef = useRef(0);
+  const [typers, setTypers] = useState([]);
 
   async function loadStatus() {
     try {
@@ -163,6 +193,16 @@ export function DmChatScreen({ userId }) {
   useInterval(() => loadMessages(), 4000, [convId]);
   useOnResume(() => { loadStatus(); loadMessages(); });
   useLive((kind) => { if (kind === "dm") loadMessages(); });
+  // "yazıyor…" (3 sn) ve çevrimiçi durumu (30 sn)
+  useInterval(() => { if (convId) api.typingList("dm:" + convId).then(setTypers).catch(() => {}); }, 3000, [convId]);
+  useInterval(() => { loadStatus(); }, 30000, [userId]);
+  function typingPing() {
+    if (!convId) return;
+    const now = Date.now();
+    if (now - lastTypingRef.current < 3000) return;
+    lastTypingRef.current = now;
+    api.setTyping("dm:" + convId).catch(() => {});
+  }
 
   const scrollDown = () => requestAnimationFrame(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; });
 
@@ -259,6 +299,7 @@ export function DmChatScreen({ userId }) {
           onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           onKeyUp=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           onInput=${(e) => {
+            if (e.target.value.length > input.length) typingPing();
             setInput(e.target.value);
             caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
@@ -274,19 +315,22 @@ export function DmChatScreen({ userId }) {
   return html`
     <div class="chat">
       <${TopBar} title=${"✉️ " + name} backLabel="←" onBack=${() => navigate("/mesajlar")}
-        sub=${s ? (s.is_staff ? "Yönetim • Profil için dokun" : "Profil ve engelleme için dokun") : ""}
+        sub=${s ? ((typers.length ? "✍️ yazıyor…" : presenceText(s.online, s.last_seen))
+          || (s.is_staff ? "Yönetim • Profil için dokun" : "Profil ve engelleme için dokun")) : ""}
         onSubClick=${() => setShowProfile(true)}
         right=${convId && html`<button class="btn ghost" style="font-size:24px;font-weight:800" onClick=${() => setShowHide(true)}>⋮</button>`} />
 
       <div class="messages" ref=${listRef}>
         ${loading ? html`<${Spinner} />`
           : messages.length === 0 && pending.length === 0 ? html`<div class="center muted" style="flex:1">${s && !s.reason ? "Henüz mesaj yok. İlk mesajı sen yaz! 👋" : "Henüz mesaj yok."}</div>`
-          : messages.map((m) => {
+          : messages.map((m, i) => {
             const mine = m.sender_id === myId;
+            const newDay = dayKey(m.created_at) !== dayKey(messages[i - 1]?.created_at);
             const counts = api.dmReactionCounts(m);
             const n = api.emojiOnlyCount(m.content);
             const big = n !== null && n >= 1 && n <= 3;
             return html`
+              ${newDay && html`<div class="day-chip" key=${"g" + m.id}><span>${dayLabel(m.created_at)}</span></div>`}
               <div class=${"mwrap" + (mine ? " mine" : "")} id=${"d" + m.id} key=${m.id}>
                 <div class="bubble" ...${longPress(() => { if (!(m.deleted && mine)) setMenuFor(m); })}>
                   <div class=${"txt" + (big && !m.deleted ? " big" : "") + (m.deleted ? " deleted" : "")}>${m.content}</div>

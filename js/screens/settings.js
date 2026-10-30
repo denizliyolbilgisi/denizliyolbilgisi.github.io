@@ -139,6 +139,9 @@ export function SettingsScreen() {
         <${Row} icon="👁" color="#0EA5E9" title="Okundu bilgisi" sub="Kapalıysa mavi tik göstermezsin, başkalarınınkini de görmezsin"
           checked=${dm ? dm.read_receipts !== false : true}
           onToggle=${(on) => dmAction(() => api.setReadReceipts(on))} />
+        <${Row} icon="🟢" color="#16A34A" title="Çevrimiçi durumumu göster" sub="Kapatırsan kimse göremez, sen de başkasınınkini göremezsin"
+          checked=${dm ? dm.show_online !== false : true}
+          onToggle=${(on) => dmAction(() => api.setShowOnline(on))} />
         <${Row} icon="🚫" color="#DC2626" title="Engellediklerim" value=${(dm?.blocks || []).length + " kişi"}
           onClick=${() => setPage("blocks")} />
       </div>

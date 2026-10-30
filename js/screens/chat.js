@@ -1,7 +1,7 @@
 // Sohbet odası: mesajlar, yanıt, fotoğraf albümü, şikayet, sabit mesaj, oda yöneticisi araçları
 import {
   html, useState, useEffect, useRef, useLayoutEffect, navigate, userMessage, chatTime, remainingText, isStillActive,
-  roleRank, roleBadge, toast, copyText, store,
+  roleRank, roleBadge, toast, copyText, store, dayKey, dayLabel, typingText,
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, useInterval, useOnResume } from "../ui.js";
@@ -97,7 +97,20 @@ export function ChatScreen({ roomId, focusId }) {
   const lastShownRef = useRef(null);
 
   const rank = roleRank(me?.role);
-  const myPower = Math.max(room.my_power || 2, rank * 2);
+  // 🛡 Gizli odada sadece kurucu yönetir (gücü sunucu belirler)
+  const myPower = room.min_rank > 0 ? (room.my_power || 2) : Math.max(room.my_power || 2, rank * 2);
+  const secret = room.min_rank > 0;
+
+  // ---------- "Yazıyor…" ----------
+  const [typers, setTypers] = useState([]);
+  const lastTypingRef = useRef(0);
+  useInterval(() => { api.typingList("oda:" + roomId).then(setTypers).catch(() => {}); }, 3000, [roomId]);
+  function typingPing() {
+    const now = Date.now();
+    if (now - lastTypingRef.current < 3000) return;
+    lastTypingRef.current = now;
+    api.setTyping("oda:" + roomId).catch(() => {});
+  }
   const powerOf = (m) => roleRank(m.profiles?.role) * 2 + ((room.admin_ids || []).includes(m.user_id) ? 1 : 0);
   const label = (m) => senderLabel(m, room.admin_ids);
   const canModerate = myPower >= 3;
@@ -381,6 +394,7 @@ export function ChatScreen({ roomId, focusId }) {
           onKeyUp=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           placeholder=${editing ? "Mesajını düzelt..." : picked.length ? "Açıklama ekle (isteğe bağlı)" : replyTo ? "Yanıtını yaz..." : "Mesaj yaz..."}
           onInput=${(e) => {
+            if (e.target.value.length > input.length) typingPing();
             setInput(e.target.value);
             caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
@@ -396,7 +410,10 @@ export function ChatScreen({ roomId, focusId }) {
   return html`
     <div class="chat">
       <${TopBar} title=${`${room.icon} ${room.name}`} onBack=${() => navigate("/menu")}
-        sub=${(room.description || "Basılı tut: Yanıtla / Sil") + (canModerate ? "  ✏️" : "")}
+        sub=${typingText(typers)
+          || [room.member_count ? `👥 ${room.member_count} üye` : null,
+              room.online_count ? `🟢 ${room.online_count} çevrimiçi` : null].filter(Boolean).join(" • ")
+          || ((room.description || "Basılı tut: Yanıtla / Sil") + (canModerate ? "  ✏️" : ""))}
         onSubClick=${canModerate ? () => setEditDesc(true) : null}
         right=${html`<button class="btn ghost" onClick=${() => setRules({ text: rulesTextFor(room, isTraffic), key: null })}>Kurallar</button>`} />
 
@@ -408,14 +425,17 @@ export function ChatScreen({ roomId, focusId }) {
         </div>`}
 
       <div style="flex:1;position:relative;display:flex;flex-direction:column;min-height:0">
+      ${secret && html`<div class="watermark" aria-hidden="true">${Array.from({ length: 48 }, (_, i) => html`<span key=${i}>@${me?.username || ""} • ${new Date().toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>`)}</div>`}
       <div class="messages" ref=${listRef} onScroll=${onListScroll}>
         ${loading ? html`<${Spinner} />`
           : messages.length === 0 ? html`<div class="center muted" style="flex:1">Henüz mesaj yok. İlk mesajı sen yaz!</div>`
-          : messages.map((m) => {
+          : messages.map((m, i) => {
             const mine = m.user_id === myId;
+            const newDay = dayKey(m.created_at) !== dayKey(messages[i - 1]?.created_at);
             const mentionsMe = !mine && (m.mention_all || (myName && api.mentionsIn(m.content).includes(myName)));
             const replied = m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : null;
             return html`
+              ${newDay && html`<div class="day-chip" key=${"g" + m.id}><span>${dayLabel(m.created_at)}</span></div>`}
               <div class=${"mwrap" + (mine ? " mine" : "")} id=${"m" + m.id} key=${m.id}>
                 ${!mine && html`<div class="sender" style=${`cursor:pointer;font-weight:700;${mentionsMe ? "color:#FFD54F" : ""}`}
                   onClick=${() => setProfileFor(m.user_id)}>${label(m)}${mentionsMe ? "  📣" : ""}</div>`}

@@ -253,3 +253,42 @@ export async function copyText(text) {
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ---------------------------------------------------------------------------
+// Gün ayracı ve çevrimiçi yazısı
+// ---------------------------------------------------------------------------
+const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+/** Mesajın yerel günü: "2026-10-30" (ayraç için) */
+export function dayKey(s) {
+  const d = parseTime(s);
+  return d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : null;
+}
+
+/** "Bugün", "Dün", "28 Ekim", eski yıllarda "28 Ekim 2025" */
+export function dayLabel(s) {
+  const d = parseTime(s);
+  if (!d) return "";
+  const now = new Date();
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return "Bugün";
+  if (d.toDateString() === y.toDateString()) return "Dün";
+  return `${d.getDate()} ${AYLAR[d.getMonth()]}` + (d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : "");
+}
+
+/** "🟢 çevrimiçi", "son görülme bugün 14:32" (gizliyse null) */
+export function presenceText(online, lastSeen) {
+  if (online === true) return "🟢 çevrimiçi";
+  const d = parseTime(lastSeen);
+  if (!d) return null;
+  const l = dayLabel(lastSeen);
+  if (l === "Bugün") return "son görülme bugün " + clock(lastSeen);
+  if (l === "Dün") return "son görülme dün " + clock(lastSeen);
+  return "son görülme " + l;
+}
+
+/** "✍️ @ahmet yazıyor…", "✍️ @ahmet ve 2 kişi yazıyor…" */
+export function typingText(names) {
+  if (!names || !names.length) return null;
+  return names.length === 1 ? `✍️ @${names[0]} yazıyor…` : `✍️ @${names[0]} ve ${names.length - 1} kişi yazıyor…`;
+}
