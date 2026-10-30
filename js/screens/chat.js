@@ -346,7 +346,7 @@ export function ChatScreen({ roomId, focusId }) {
       <div class="notice muted-red">
         <div class="bold" style="font-size:17px">${globalMuted ? "🔇 Susturuldun" : "🔇 Bu odada susturuldun"} • Kalan: ${remainingText(until)}</div>
         ${reason && html`<div style="margin-top:4px">Sebep: ${reason}</div>`}
-        <div class="small" style="margin-top:4px;color:#FFD6D6">
+        <div class="small" style="margin-top:4px;color:var(--red-text-soft)">
           ${globalMuted ? "Bu sürede mesaj yazamazsın, sadece okuyabilirsin." : `Bu sürede ${room.icon} ${room.name} odasına yazamazsın; diğer odalara yazabilirsin.`}
         </div>
       </div>`;
@@ -355,10 +355,10 @@ export function ChatScreen({ roomId, focusId }) {
   } else {
     bottom = html`
       ${editing && html`
-        <div class="replybar" style="background:#3A3410">
-          <div class="bar" style="background:#FFD54F"></div>
+        <div class="replybar" style="background:var(--yellow-box)">
+          <div class="bar" style="background:var(--yellow)"></div>
           <div class="grow">
-            <div class="small bold" style="color:#FFD54F">✏️ Mesajını düzenliyorsun</div>
+            <div class="small bold" style="color:var(--yellow)">✏️ Mesajını düzenliyorsun</div>
             <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${api.previewText(editing)}</div>
           </div>
           <button class="btn ghost" onClick=${() => { setEditing(null); setInput(""); caretRef.current = null; }}>✕</button>
@@ -437,11 +437,11 @@ export function ChatScreen({ roomId, focusId }) {
             return html`
               ${newDay && html`<div class="day-chip" key=${"g" + m.id}><span>${dayLabel(m.created_at)}</span></div>`}
               <div class=${"mwrap" + (mine ? " mine" : "")} id=${"m" + m.id} key=${m.id}>
-                ${!mine && html`<div class="sender" style=${`cursor:pointer;font-weight:700;${mentionsMe ? "color:#FFD54F" : ""}`}
+                ${!mine && html`<div class="sender" style=${`cursor:pointer;font-weight:700;${mentionsMe ? "color:var(--yellow)" : ""}`}
                   onClick=${() => setProfileFor(m.user_id)}>${label(m)}${mentionsMe ? "  📣" : ""}</div>`}
                 <div class="bubble" ...${longPress(() => setMenuFor(m))}
-                  style=${mentionsMe ? `background:#5A4A12;border:${highlight === m.id ? 3 : 1}px solid #FFD54F`
-                    : highlight === m.id ? "box-shadow:0 0 0 3px #FFD54F" : ""}>
+                  style=${mentionsMe ? `background:var(--mention-bg);border:${highlight === m.id ? 3 : 1}px solid var(--yellow)`
+                    : highlight === m.id ? "box-shadow:0 0 0 3px var(--yellow)" : ""}>
                   ${m.reply_to_id && html`
                     <div class="quote" onClick=${(e) => { e.stopPropagation(); scrollToMessage(m.reply_to_id); }}>
                       <div class="bar"></div>
@@ -451,7 +451,7 @@ export function ChatScreen({ roomId, focusId }) {
                       </div>
                     </div>`}
                   <${PhotoAlbum} photos=${m.photos} expired=${m.photos_expired} onOpen=${(i) => setViewer({ msg: m, index: i })} />
-                  ${m.content && m.content.trim() && html`<${ClampText} text=${m.content} color=${mine || mentionsMe ? "#FFE082" : "#58A6FF"} />`}
+                  ${m.content && m.content.trim() && html`<${ClampText} text=${m.content} color=${mine ? "#FFE082" : mentionsMe ? "var(--mention-link)" : "var(--link)"} />`}
                   <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${m.edited_at ? "düzenlendi • " : ""}${chatTime(m.created_at)}${mine ? "  ✓" : ""}</div>
                 </div>
                 ${api.reactionCounts(m).length > 0 && html`
@@ -496,9 +496,9 @@ export function ChatScreen({ roomId, focusId }) {
             ${m.edited_at && rank >= 2 && html`<button class="list-btn" onClick=${() => { setHistoryFor(m); close(); }}>📝  Düzenleme geçmişi</button>`}
             ${m.content && m.content.trim() && html`<button class="list-btn" onClick=${async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); }}>📋  Kopyala</button>`}
             ${m.photos && m.photos.length > 0 && !m.photos_expired && html`<button class="list-btn" onClick=${() => { setViewer({ msg: m, index: 0 }); close(); }}>🖼  Fotoğrafları aç</button>`}
-            ${m.user_id !== myId && html`<button class="list-btn" style="color:#FFB020" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet Et</button>`}
+            ${m.user_id !== myId && html`<button class="list-btn" style="color:var(--amber)" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet Et</button>`}
             ${canModerate && html`<button class="list-btn" onClick=${() => { close(); pin(m); }}>${m.id === room.pinned_message_id ? "📌  Sabitlemeyi kaldır" : "📌  Sabitle"}</button>`}
-            ${canManage && m.user_id !== myId && html`<button class="list-btn" style="color:#FFB020" onClick=${() => { setMuteFor(m); close(); }}>🔇  Bu odada sustur / aç</button>`}
+            ${canManage && m.user_id !== myId && html`<button class="list-btn" style="color:var(--amber)" onClick=${() => { setMuteFor(m); close(); }}>🔇  Bu odada sustur / aç</button>`}
             ${canDelete && html`<button class="list-btn" style="color:var(--red-soft)" onClick=${() => { setDeleteFor(m); close(); }}>🗑  Sil</button>`}
             <button class="list-btn muted" onClick=${close}>Vazgeç</button>
           </${Modal}>`;

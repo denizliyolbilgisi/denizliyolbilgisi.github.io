@@ -120,14 +120,14 @@ export function InvitesScreen() {
         </button>
         ${msg && html`<div class=${"msg " + (msg.err ? "err" : "ok")}>${msg.text}</div>`}
         ${helps.length > 0 && html`
-          <div class="card" style="background:#4A2A10;border-color:#FFB020">
+          <div class="card" style="background:var(--amber-box);border-color:var(--amber)">
             <div class="bold" style="font-size:19px">🆘 Güncellemesi gerekenler (Android)</div>
-            <div class="small" style="color:#FFE0B2;margin-bottom:6px">"Gönder" ile yeni Android sürümünü WhatsApp'tan gönderebilirsin. Dosyayı açıp "Güncelle"ye basması yeterli.</div>
+            <div class="small" style="color:var(--amber-text-soft);margin-bottom:6px">"Gönder" ile yeni Android sürümünü WhatsApp'tan gönderebilirsin. Dosyayı açıp "Güncelle"ye basması yeterli.</div>
             ${helps.slice(0, 6).map((h) => html`
               <div class="row" key=${h.user_id} style="margin-top:8px">
                 <div class="grow">
                   <div class="bold" style="font-size:18px">@${h.username || ""}</div>
-                  <div class="small" style="color:#FFE0B2">${h.app_version_name ? "Sürüm " + h.app_version_name : "Eski sürüm"}${h.request_id ? " • yardım istedi" : ""}</div>
+                  <div class="small" style="color:var(--amber-text-soft)">${h.app_version_name ? "Sürüm " + h.app_version_name : "Eski sürüm"}${h.request_id ? " • yardım istedi" : ""}</div>
                 </div>
                 <button class="btn small" disabled=${!!sendingApk} onClick=${() => sendApp(h)}>${sendingApk === h.user_id ? "İndiriliyor…" : "📤 Gönder"}</button>
                 ${h.request_id && html`<button class="btn small ghost" disabled=${!!sendingApk} onClick=${async () => {

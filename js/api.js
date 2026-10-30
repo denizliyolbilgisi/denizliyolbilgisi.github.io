@@ -532,3 +532,10 @@ export const setTyping = (key) => rpc("set_typing", { p_key: key });
 export const typingList = async (key) => ((await rpc("typing_list", { p_key: key })) || []).map((x) => x.username).filter(Boolean);
 export const presence = (online) => rpc("presence", { p_online: online });
 export const setShowOnline = (on) => rpc("set_show_online", { p_on: on });
+
+// ---------- 💊 Nöbetçi eczaneler ----------
+export async function eczaneler() {
+  return check(await sb.from("nobetci_eczaneler")
+    .select("id, ilce, ad, adres, telefon, baslangic, bitis, lat, lng")
+    .order("ilce").order("ad"));
+}

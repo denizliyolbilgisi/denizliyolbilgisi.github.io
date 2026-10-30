@@ -1,6 +1,7 @@
 // Ayarlar: telefonun kendi ayarları gibi sade liste (Özel mesajlar • Bildirimler); ayrıntılar alt sayfada
 import { html, useState, useEffect, navigate, userMessage, isStillActive, remainingText, isStandalone, toast, roleBadge } from "../lib.js";
 import * as api from "../api.js";
+import { themePref, setThemePref } from "../theme.js";
 import { TopBar, Modal, Spinner, Switch, useInterval } from "../ui.js";
 import { APP_VERSION } from "../config.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
@@ -17,6 +18,7 @@ function statusText(until) {
 }
 
 export function SettingsScreen() {
+  const [theme, setTheme] = useState(themePref());
   const [prefs, setPrefs] = useState(null);
   const [dm, setDm] = useState(null);
   const [rooms, setRooms] = useState(api.cachedRooms());
@@ -129,7 +131,17 @@ export function SettingsScreen() {
   } else {
     const chat = statusRow("chat");
     const radar = statusRow("radar");
+    const pickTheme = (v) => { setThemePref(v); setTheme(v); };
     content = html`
+      <div class="set-sec">GÖRÜNÜM</div>
+      <div class="set-grp">
+        ${[["system", "📱", "#475569", "Telefona göre", "Telefon gece modundaysa koyu, değilse açık"],
+           ["dark", "🌙", "#1E293B", "Koyu", null],
+           ["light", "☀️", "#F59E0B", "Açık", null]].map(([v, ic, col, t, sub]) => html`
+          <${Row} key=${v} icon=${ic} color=${col} title=${t} sub=${sub}
+            value=${theme === v ? "✓" : ""} valueClass="g" onClick=${() => pickTheme(v)} />`)}
+      </div>
+
       <div class="set-sec">ÖZEL MESAJLAR</div>
       <div class="set-grp">
         <${Row} icon="✉️" color="#2563EB" title="Bana özel mesaj yazılabilsin"
@@ -181,7 +193,7 @@ export function SettingsScreen() {
         <${Modal} title=${(silenceFor === "chat" ? "Sohbet" : "Harita") + " bildirimleri – sessize al"} center=${false}
           onClose=${() => setSilenceFor(null)}>
           ${SILENCE.map(([label, min]) => html`
-            <button class="list-btn" key=${label} style=${min === null ? "color:#FF8A80;font-weight:700" : ""}
+            <button class="list-btn" key=${label} style=${min === null ? "color:var(--red-soft);font-weight:700" : ""}
               onClick=${() => {
                 const until = min === null ? FOREVER : new Date(Date.now() + min * 60000).toISOString();
                 save({ ...prefs, [key(silenceFor)]: until });

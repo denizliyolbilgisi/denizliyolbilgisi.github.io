@@ -76,7 +76,7 @@ export function ProfileScreen() {
               <div class="muted small">(E-postanı sadece sen ve yönetim görür)</div>`}
           </div>
 
-          <div class="card" style=${`background:#2A2412;border:2px solid ${GOLD}b3`}>
+          <div class="card" style=${`background:var(--gold-box);border:2px solid ${GOLD}b3`}>
             <div class="row">
               <span style="font-size:44px">${r.icon}</span>
               <div>
@@ -85,7 +85,7 @@ export function ProfileScreen() {
               </div>
             </div>
             ${r.next_min && r.next_name ? html`
-              <div style="height:10px;border-radius:5px;background:rgba(255,255,255,.15);margin-top:12px;overflow:hidden">
+              <div style="height:10px;border-radius:5px;background:rgba(var(--fg),.15);margin-top:12px;overflow:hidden">
                 <div style=${`height:100%;width:${Math.round(progress(p) * 100)}%;background:${GOLD}`}></div>
               </div>
               <div class="soft" style="margin-top:6px">Sonraki: ${r.next_icon || ""} ${r.next_name} • ${Math.max(0, r.next_min - p.points)} puan kaldı</div>`
@@ -202,7 +202,7 @@ function RenameModal({ current, nextChange, onClose, onDone }) {
         }}>${busy ? "Kaydediliyor…" : "Kaydet"}</button>`,
       ]}>
       <div style="font-size:17px">Şu anki adın: <b>@${current}</b></div>
-      ${wait ? html`<div style="color:#FFD54F;margin-top:8px">Kullanıcı adını 7 günde bir değiştirebilirsin.<br />
+      ${wait ? html`<div style="color:var(--yellow);margin-top:8px">Kullanıcı adını 7 günde bir değiştirebilirsin.<br />
           Sonraki hak: ${pad(wait.getDate())}.${pad(wait.getMonth() + 1)}.${wait.getFullYear()} ${pad(wait.getHours())}:${pad(wait.getMinutes())}</div>` : html`
         <input class="input" autocapitalize="none" placeholder="Yeni kullanıcı adı" style="margin-top:8px"
           value=${text} onInput=${(e) => setText(cleanUsername(e.target.value.replace(/^@/, "")))} />
@@ -257,7 +257,7 @@ function PointRulesModal({ onClose }) {
       ${POINT_RULES.map(([w, v]) => html`
         <div class="row" key=${w} style="margin:4px 0">
           <span class="grow">${w}</span>
-          <b style=${`color:${v.startsWith("−") ? "#FF8A80" : "#7EE2A8"}`}>${v}</b>
+          <b style=${`color:${v.startsWith("−") ? "var(--red-soft)" : "var(--ok)"}`}>${v}</b>
         </div>`)}
       <div class="bold" style="margin-top:10px">Rütbeler</div>
       ${RANKS.map(([n, m]) => html`<div key=${n}>${n} – ${m} puan</div>`)}
@@ -316,8 +316,8 @@ export function MemberProfileModal({ userId, onClose, onMessage }) {
       actions=${html`<button class="btn" onClick=${onClose}>Kapat</button>`}>
       ${err ? html`<div class="msg err">${err}</div>` : !p ? html`<${Spinner} />` : html`
         <div class="soft">${roleLabel(p.role)}</div>
-        ${p.is_banned && html`<div style="color:#FF8A80">⛔ Hesabı askıda</div>`}
-        <div class="row" style="background:#2A2412;border-radius:12px;padding:10px;margin-top:8px">
+        ${p.is_banned && html`<div style="color:var(--red-soft)">⛔ Hesabı askıda</div>`}
+        <div class="row" style="background:var(--gold-box);border-radius:12px;padding:10px;margin-top:8px">
           <span style="font-size:32px">${r.icon}</span>
           <div><div class="bold" style=${`font-size:19px;color:${GOLD}`}>${r.name}</div><div class="small">${p.points} DYB Puanı</div></div>
         </div>
@@ -329,9 +329,9 @@ export function MemberProfileModal({ userId, onClose, onMessage }) {
           <div style="margin-top:12px">
             ${(!dm.reason || dm.conversation_id) && html`<button class="btn block big" onClick=${openDm}>
               ${dm.conversation_id ? "✉️ Özel sohbeti aç" : "✉️ Mesaj gönder"}</button>`}
-            ${dm.reason && html`<div style="color:#FFB020;margin-top:8px;font-size:16px">🔒 ${dm.reason}</div>`}
+            ${dm.reason && html`<div style="color:var(--amber);margin-top:8px;font-size:16px">🔒 ${dm.reason}</div>`}
             ${!dm.is_staff && html`<button class="btn block ghost" disabled=${dmBusy} onClick=${toggleBlock}
-              style=${`margin-top:6px;color:${dm.blocked_by_me ? "#3DDC84" : "#FF8A80"}`}>
+              style=${`margin-top:6px;color:${dm.blocked_by_me ? "var(--green-text)" : "var(--red-soft)"}`}>
               ${dm.blocked_by_me ? "✅ Engeli kaldır" : "🚫 Özel mesaj için engelle"}</button>`}
           </div>`}`}
     </${Modal}>`;

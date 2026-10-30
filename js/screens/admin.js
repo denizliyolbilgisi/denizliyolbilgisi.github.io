@@ -206,7 +206,7 @@ export function AdminScreen({ startTab }) {
             html`<button class="btn outline" onClick=${() => setTempPass(null)}>Kapat</button>`,
           ]}>
           <div>${tempPass.name} için geçici şifre:</div>
-          <div style="font-size:28px;font-weight:800;color:#FFD54F;text-align:center;background:rgba(0,0,0,.35);border-radius:12px;padding:14px 0;margin:10px 0;user-select:all">${tempPass.password}</div>
+          <div style="font-size:28px;font-weight:800;color:var(--yellow);text-align:center;background:rgba(0,0,0,.35);border-radius:12px;padding:14px 0;margin:10px 0;user-select:all">${tempPass.password}</div>
           <div class="soft">Bu şifreyi üyeye güvenli şekilde ilet (yüz yüze, telefon ya da özel mesaj). Pencereyi kapatınca bir daha gösterilmez.</div>
         </${Modal}>`}
 
@@ -246,18 +246,18 @@ function MemberCard({ m, showPrivate, latestCode, onClick }) {
       </div>
       <div class="soft small" style="margin-top:6px">Katıldı: ${dateText(m.created_at)} • Davet eden: ${m.invited_by ? "@" + m.invited_by : "-"}</div>
       <div class="soft small">Mesaj: ${m.message_count ?? 0} • Son mesaj: ${m.last_message_at ? agoText(m.last_message_at) : "yok"}</div>
-      ${(m.room_admin_of || []).length > 0 && html`<div class="small bold" style="color:#8BE0A4">🔰 Oda yöneticisi: ${m.room_admin_of.map(roomName).join(", ")}</div>`}
+      ${(m.room_admin_of || []).length > 0 && html`<div class="small bold" style="color:var(--ok)">🔰 Oda yöneticisi: ${m.room_admin_of.map(roomName).join(", ")}</div>`}
       ${showPrivate && html`
         ${m.email && html`<div class="soft small">✉️ ${m.email}</div>`}
-        <div class="small" style="color:#9FC5FF">⏱ Bugün ${durationText(m.usage_today)} • 7 gün ${durationText(m.usage_7d)} • Toplam ${durationText(m.usage_total)}</div>
+        <div class="small" style="color:var(--blue-text)">⏱ Bugün ${durationText(m.usage_today)} • 7 gün ${durationText(m.usage_7d)} • Toplam ${durationText(m.usage_total)}</div>
         <div class="soft small">👁 Son görülme: ${m.last_seen_at ? agoText(m.last_seen_at) : "yok"}</div>
-        <div class="small" style=${`color:${m.app_version_code && m.app_version_code >= latestCode ? "var(--soft)" : "#FFC27A"}`}>
+        <div class="small" style=${`color:${m.app_version_code && m.app_version_code >= latestCode ? "var(--soft)" : "var(--orange-text)"}`}>
           📲 ${!m.app_version_code ? "Sürüm: bilinmiyor (eski Android ya da iPhone)"
             : m.app_version_code < latestCode ? `Sürüm: ${m.app_version_name || m.app_version_code} ⚠️ güncel değil`
             : `Sürüm: ${m.app_version_name || m.app_version_code} ✅`}</div>
         <div class="soft small">⭐ DYB Puanı: ${m.points ?? 0}</div>`}
-      ${isMuted(m) && html`<div class="small bold" style="color:#FFC27A">Kalan: ${remainingText(m.muted_until)} • Sebep: ${m.mute_reason || "-"} • Susturan: ${m.muted_by ? "@" + m.muted_by : "-"}</div>`}
-      ${isBanned(m) && html`<div class="small bold" style="color:#FF8A80">Yasak sebebi: ${m.ban_reason || "-"} • Yasaklayan: ${m.banned_by ? "@" + m.banned_by : "-"}</div>`}
+      ${isMuted(m) && html`<div class="small bold" style="color:var(--orange-text)">Kalan: ${remainingText(m.muted_until)} • Sebep: ${m.mute_reason || "-"} • Susturan: ${m.muted_by ? "@" + m.muted_by : "-"}</div>`}
+      ${isBanned(m) && html`<div class="small bold" style="color:var(--red-soft)">Yasak sebebi: ${m.ban_reason || "-"} • Yasaklayan: ${m.banned_by ? "@" + m.banned_by : "-"}</div>`}
     </div>`;
 }
 
@@ -402,7 +402,7 @@ function ReportsTab({ myRank, reload, onInfo, onChanged, onMute }) {
                   : html`<div class="muted small">Bu üye senin rütbende ya da üstünde. Sadece şikayeti kapatabilirsin.</div>`}
                 <button class="btn block green" disabled=${working} onClick=${() => act("Şikayet kapatıldı.", () => api.resolveReport(r.id, "Sorun bulunmadı"))}>✅  Sorun Yok, Kapat</button>
               </div>`
-              : html`<div class="small bold" style="color:#8BE0A4;margin-top:8px">Kapatan: ${r.resolved_by_name ? "@" + r.resolved_by_name : "-"} • ${r.resolution || ""}</div>`}
+              : html`<div class="small bold" style="color:var(--ok);margin-top:8px">Kapatan: ${r.resolved_by_name ? "@" + r.resolved_by_name : "-"} • ${r.resolution || ""}</div>`}
           </div>`;
       })}`;
 }

@@ -276,16 +276,16 @@ export function DmChatScreen({ userId }) {
   let bottom = null;
   if (s && s.reason) {
     bottom = html`
-      <div class="notice" style="background:#3A2A10">
-        <div class="bold" style="color:#FFB020;font-size:17px">🔒 ${s.reason}</div>
+      <div class="notice" style="background:var(--amber-box)">
+        <div class="bold" style="color:var(--amber);font-size:17px">🔒 ${s.reason}</div>
         ${s.blocked_by_me && html`<div class="small soft">Engeli kaldırmak için yukarıdaki ada dokun.</div>`}
       </div>`;
   } else if (s) {
     bottom = html`
       ${editing && html`
-        <div class="replybar" style="background:#3A3410">
-          <div class="bar" style="background:#FFD54F"></div>
-          <div class="grow small bold" style="color:#FFD54F">✏️ Mesajını düzenliyorsun</div>
+        <div class="replybar" style="background:var(--yellow-box)">
+          <div class="bar" style="background:var(--yellow)"></div>
+          <div class="grow small bold" style="color:var(--yellow)">✏️ Mesajını düzenliyorsun</div>
           <button class="btn ghost" onClick=${() => { setEditing(null); setInput(""); caretRef.current = null; }}>✕</button>
         </div>`}
       <div class="composer">
@@ -366,7 +366,7 @@ export function DmChatScreen({ userId }) {
             <div class="muted" style="margin-bottom:6px;max-height:4.5em;overflow:hidden">${m.content}</div>
             ${m.deleted ? html`
               <div class="soft small" style="margin-bottom:6px">Gönderen bu mesajı sildi. Uygunsuz bir şey yazdıysa şikayet edebilirsin; yönetim silinen mesajın aslını görebilir.</div>
-              <button class="list-btn" style="color:#FFB020" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>
+              <button class="list-btn" style="color:var(--amber)" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>
               <button class="list-btn muted" onClick=${close}>Vazgeç</button>` : html`
             <div class="emoji-row">
               ${[...(my && !api.REACTIONS.includes(my) ? [my] : []), ...api.REACTIONS].slice(0, 6).map((e) => html`
@@ -378,7 +378,7 @@ export function DmChatScreen({ userId }) {
             <button class="list-btn" onClick=${async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); }}>📋  Kopyala</button>
             ${mine
               ? html`<button class="list-btn" style="color:var(--red-soft)" onClick=${() => { setDeleteFor(m); close(); }}>🗑  Sil</button>`
-              : html`<button class="list-btn" style="color:#FFB020" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>`}
+              : html`<button class="list-btn" style="color:var(--amber)" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>`}
             <button class="list-btn muted" onClick=${close}>Vazgeç</button>`}
           </${Modal}>`;
       })()}

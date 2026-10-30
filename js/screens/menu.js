@@ -185,22 +185,22 @@ export function MenuScreen({ onBanned }) {
 
       <div class="menu-cards" data-tick=${tick}>
         <${MenuCard} icon="🗺" colors=${["#3D8BFF", "#1E5FD1"]} title="Harita" line=${radarLine}
-          live=${radarText} liveColor=${radarError ? "#FFB020" : "#3DDC84"} onClick=${() => navigate("/harita")} />
+          live=${radarText} liveColor=${radarError ? "var(--amber)" : "var(--green-text)"} onClick=${() => navigate("/harita")} />
         ${rooms.map((r) => html`
           <${MenuCard} key=${r.id} icon=${r.icon} colors=${ROOM_COLORS[r.id] || ["#7E57C2", "#512DA8"]} title=${r.name}
             line=${roomLine(r)}
             live=${roomStatus(r) + (isStillActive(r.muted_until) && rank < 4 ? " • 🔇 susturuldun" : "")}
-            liveColor=${chatError ? "#FFB020" : "#3DDC84"}
+            liveColor=${chatError ? "var(--amber)" : "var(--green-text)"}
             unread=${api.hasUnread(r, me?.username) || (roomUnread[r.id] || 0) > 0}
             count=${roomUnread[r.id] || 0}
             onClick=${() => navigate("/oda/" + r.id)} />`)}
       </div>
 
       ${muted && html`
-        <div class="card" style="margin:14px 16px 0;background:#5A1E1E;border-color:#FF6B6B">
+        <div class="card" style="margin:14px 16px 0;background:var(--red-box);border-color:#FF6B6B">
           <div class="bold" style="font-size:18px">🔇 Susturuldun • Kalan: ${remainingText(me.muted_until)}</div>
           ${me.mute_reason && html`<div style="margin-top:6px">Sebep: ${me.mute_reason}</div>`}
-          <div class="small" style="margin-top:6px;color:#FFD6D6">Bu sürede mesaj yazamaz, radar bildiremez, oy veremez ve davet kodu üretemezsin.</div>
+          <div class="small" style="margin-top:6px;color:var(--red-text-soft)">Bu sürede mesaj yazamaz, radar bildiremez, oy veremez ve davet kodu üretemezsin.</div>
         </div>`}
 
       <div style="flex:1"></div>

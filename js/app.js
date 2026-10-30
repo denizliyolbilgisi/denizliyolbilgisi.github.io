@@ -7,11 +7,13 @@ import * as api from "./api.js";
 import { Toaster, Spinner } from "./ui.js";
 import { refreshPush } from "./push.js";
 import { startUsageTracking } from "./usage.js";
+import "./theme.js";
 import { LoginScreen, RegisterScreen, UsernameScreen, BannedScreen, NewPasswordScreen } from "./screens/auth.js";
 import { ProfileScreen } from "./screens/profile.js";
 import { MenuScreen } from "./screens/menu.js";
 import { DmInboxScreen, DmChatScreen } from "./screens/dm.js";
 import { ChatScreen } from "./screens/chat.js";
+import { EczaneScreen, EczaneMapScreen } from "./screens/eczane.js";
 import { MapScreen } from "./screens/map.js";
 import { InvitesScreen } from "./screens/invites.js";
 import { SettingsScreen } from "./screens/settings.js";
@@ -155,6 +157,10 @@ function App() {
     screen = html`<${NewPasswordScreen} onDone=${() => { setMustChange(false); navigate("/menu", true); }} />`;
   } else if (profile && !profile.username) {
     screen = html`<${UsernameScreen} onDone=${(name) => { setProfile({ ...profile, username: name }); navigate("/menu", true); }} />`;
+  } else if (path === "/oda/eczane") {
+    screen = html`<${EczaneScreen} />`;
+  } else if (path === "/eczane-harita") {
+    screen = html`<${EczaneMapScreen} focusId=${query.get("id")} />`;
   } else if (path.startsWith("/oda/")) {
     const roomId = decodeURIComponent(path.slice(5)) || "trafik";
     screen = html`<${ChatScreen} key=${roomId} roomId=${roomId} focusId=${parseInt(query.get("m") || "", 10) || null} />`;
