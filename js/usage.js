@@ -38,6 +38,8 @@ function onVisible() {
   if (!visibleSince) visibleSince = Date.now();
   clearInterval(timer);
   presence(true);
+  // Uygulama açıldı: bana gelen özel mesajlar "ulaştı" (✓✓) olsun
+  setTimeout(() => { if (api.myId()) api.markDmDelivered().catch(() => {}); }, 1500);
   timer = setInterval(() => { flush(true); presence(true); }, INTERVAL_MS);
 }
 

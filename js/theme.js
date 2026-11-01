@@ -26,3 +26,30 @@ export function setThemePref(v) {
 
 mq?.addEventListener?.("change", () => { if (themePref() === "system") applyTheme(); });
 applyTheme();
+
+// ---------- 🔠 Yazı boyutu (5 seviye, bu cihazda saklanır) ----------
+const TKEY = "dyb_text";
+export const TEXT_LEVELS = [0.85, 0.92, 1, 1.1, 1.2];
+export const TEXT_NAMES = ["Çok küçük", "Küçük", "Normal", "Büyük", "Çok büyük"];
+
+export function textLevel() {
+  try {
+    const v = parseInt(localStorage.getItem(TKEY) || "", 10);
+    return v >= 1 && v <= 5 ? v : 3;
+  } catch (_) { return 3; }
+}
+
+/** Bütün sayfa orantılı büyür / küçülür (haritada uygulanmaz: harita dokunuşları bozulmasın) */
+export function applyText() {
+  const onMap = /^#\/(harita|eczane-harita)/.test(location.hash || "");
+  const z = onMap ? 1 : TEXT_LEVELS[textLevel() - 1];
+  document.documentElement.style.setProperty("--z", String(z));
+}
+
+export function setTextLevel(n) {
+  try { localStorage.setItem(TKEY, String(n)); } catch (_) { /* */ }
+  applyText();
+}
+
+window.addEventListener("hashchange", applyText);
+applyText();

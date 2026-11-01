@@ -49,6 +49,7 @@
   --blue-box: #13284A;
   --chip-bg: rgba(0, 0, 0, .35);
   --chip-fg: #CDD8E6;
+  --gold: #FFC94D;
   color-scheme: dark;
 }
 
@@ -91,6 +92,7 @@
   --blue-box: #DBEAFE;
   --chip-bg: #E2E8F0;
   --chip-fg: #374151;
+  --gold: #A16207;
   color-scheme: light;
 }
 :root[data-theme="light"] .bubble { box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -471,3 +473,72 @@ textarea.input { resize: none; }
 .ecz-pin.focus { width: 48px; height: 48px; font-size: 26px; border-width: 3px; box-shadow: 0 0 0 6px rgba(22,163,74,.3), 0 2px 10px rgba(0,0,0,.4); }
 .ecz-pop { pointer-events: auto; margin: 0; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
 .ecz-x { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 2px; }
+
+/* ---- 1.1.9: A menüsü (kare kutular) ---- */
+.home-head { display: flex; align-items: center; gap: 12px; padding: calc(var(--safe-top) + 16px) 18px 6px; }
+.home-logo { width: 48px !important; height: 48px !important; font-size: 15px !important; flex: none; margin: 0 !important; }
+.home-title { font-size: 21px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-sub { font-size: 15px; color: var(--soft); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ann-strip { display: flex; align-items: flex-start; gap: 10px; margin: 8px 16px 0; padding: 10px 12px; width: calc(100% - 32px);
+  border-radius: 14px; border: 1px solid #2E7D5B; background: rgba(46, 125, 91, .22); color: var(--text); font: inherit;
+  font-size: 15px; font-weight: 700; text-align: left; cursor: pointer; }
+.ann-strip.warn { border-color: #B26A00; background: rgba(178, 106, 0, .22); }
+.ann-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ann-strip.open .ann-t { white-space: pre-wrap; font-weight: 600; }
+.ann-c { font-weight: 800; }
+.home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 16px 0; }
+.htile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 128px;
+  padding: 14px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; }
+.htile.unread { border: 2px solid #16A34A; }
+.htile:active { transform: scale(.98); }
+.hic { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; margin-bottom: auto; }
+.htt { font-size: 17px; font-weight: 800; line-height: 1.2; margin-top: 10px; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.hts { font-size: 13px; color: var(--muted); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbadge { position: absolute; top: 12px; right: 12px; background: #16A34A; color: #fff; font-size: 12px; font-weight: 800;
+  border-radius: 999px; padding: 3px 9px; }
+/* Alt çubuk: telefonun yazı büyütmesinden etkilenmez, "Ana Sayfa" tek satıra sığar */
+.bottom-nav { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.bottom-nav button { font-size: 12px !important; white-space: nowrap; letter-spacing: -.1px; }
+.bottom-nav button .i { font-size: 26px; }
+
+/* ---- 1.1.9: sade Profilim ---- */
+.pr-head { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.pr-av { width: 64px; height: 64px; border-radius: 50%; background: #2563EB; color: #fff; display: flex; align-items: center;
+  justify-content: center; font-size: 28px; font-weight: 800; flex: none; }
+.pr-name { font-size: 22px; font-weight: 800; }
+.pr-sub { font-size: 14px; color: var(--muted); font-weight: 600; }
+.pr-bio { font-size: 15px; color: var(--soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-rank { display: block; width: 100%; margin-top: 16px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.pr-rs { font-size: 13px; color: var(--muted); font-weight: 700; }
+.pr-bar { height: 8px; border-radius: 4px; background: rgba(var(--fg), .1); margin-top: 10px; overflow: hidden; }
+.pr-bar div { height: 100%; background: #D69E2E; border-radius: 4px; }
+.pr-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.pr-st { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 4px; text-align: center; }
+.pr-st b { display: block; font-size: 20px; font-weight: 800; }
+.pr-st span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.pr-out { justify-content: center; color: var(--red-soft); font-weight: 800; font-size: 17px; }
+.seen { align-self: flex-end; font-size: 12px; color: var(--muted); font-weight: 600; margin: 2px 6px 0; }
+.bubble.pending { opacity: .8; }
+
+/* ---- 1.1.9: 🔠 yazı boyutu (Ayarlar → Görünüm) ---- */
+:root { --z: 1; }
+#app { zoom: var(--z); }
+.screen { min-height: calc(100vh / var(--z)); min-height: calc(100dvh / var(--z)); }
+.chat { height: calc(100vh / var(--z)); height: calc(100dvh / var(--z)); }
+.ts-row { display: flex; gap: 6px; padding: 10px 12px 4px; }
+.ts-btn { flex: 1; border: 1.5px solid var(--line); background: var(--card-2); color: var(--text); border-radius: 12px;
+  padding: 8px 0; font-family: inherit; font-weight: 800; cursor: pointer; line-height: 1; }
+.ts-btn.on { background: #2563EB; border-color: #2563EB; color: #fff; }
+.ts-prev { padding: 6px 14px 12px; color: var(--soft); }
+
+/* ---- 1.1.9: 📡 internet yok ---- */
+.screen.offline { align-items: center; justify-content: center; text-align: center; padding: 24px 28px; gap: 6px; }
+.off-ic { width: 104px; height: 104px; border-radius: 50%; background: var(--card); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; color: var(--muted); margin-bottom: 10px; }
+.screen.offline h2 { margin: 0; font-size: 23px; }
+.screen.offline p { margin: 0; color: var(--soft); font-size: 17px; max-width: 320px; }
+.screen.offline .btn { margin-top: 18px; min-width: 220px; }
+.screen.offline .off-note { font-size: 14px; color: var(--muted); margin-top: 10px; }

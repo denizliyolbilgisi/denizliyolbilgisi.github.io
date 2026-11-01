@@ -5,7 +5,7 @@ import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume, useLive } 
 import { MemberProfileModal } from "./profile.js";
 import { EmojiPanel, ReportDialog } from "./chat.js";
 
-const MAX_LENGTH = 500;
+const MAX_LENGTH = 1024;
 const AVATAR_COLORS = ["#E57373", "#64B5F6", "#81C784", "#FFB74D", "#BA68C8", "#4DB6AC", "#F06292", "#7986CB"];
 
 function avatarColor(key) {
@@ -241,6 +241,8 @@ export function DmChatScreen({ userId }) {
       // Mesaj hemen 🕓 ile görünür, yazma alanı boşalır
       const p = { id: Date.now() + Math.random(), text, failed: false };
       setPending((l) => [...l, p]);
+      // 🕓 sadece gönderim 1 saniyeden uzun sürerse görünür (internet yavaş / yok)
+      setTimeout(() => setPending((l) => l.map((x) => (x.id === p.id ? { ...x, slow: true } : x))), 1000);
       setInput("");
       caretRef.current = null;
       scrollDown();
@@ -270,6 +272,15 @@ export function DmChatScreen({ userId }) {
     }
   }
 
+  // Instagram gibi: "Görüldü" sadece son gönderdiğim mesajın altında
+  const lastMineId = (() => {
+    for (let k = messages.length - 1; k >= 0; k--) {
+      const m = messages[k];
+      if (m.sender_id === myId && !m.deleted) return m.id;
+    }
+    return null;
+  })();
+
   const s = status;
   const name = s ? `@${s.username || ""} ${roleBadge(s.role)}`.trim() : "Özel mesaj";
 
@@ -293,7 +304,7 @@ export function DmChatScreen({ userId }) {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
         }}>${showEmoji ? "⌨️" : "😊"}</button>
-        <textarea class="input" rows="1" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
+        <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
           placeholder=${editing ? "Mesajını düzelt..." : "Mesaj yaz..."}
           onFocus=${() => setShowEmoji(false)}
           onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
@@ -325,6 +336,7 @@ export function DmChatScreen({ userId }) {
           : messages.length === 0 && pending.length === 0 ? html`<div class="center muted" style="flex:1">${s && !s.reason ? "Henüz mesaj yok. İlk mesajı sen yaz! 👋" : "Henüz mesaj yok."}</div>`
           : messages.map((m, i) => {
             const mine = m.sender_id === myId;
+            const seen = m.id === lastMineId && m.status === "read";
             const newDay = dayKey(m.created_at) !== dayKey(messages[i - 1]?.created_at);
             const counts = api.dmReactionCounts(m);
             const n = api.emojiOnlyCount(m.content);
@@ -341,13 +353,14 @@ export function DmChatScreen({ userId }) {
                   <div class="reacts" style=${(m.reactions || []).some((r) => r.user_id === myId) ? "border-color:#3D8BFF" : ""}>
                     ${counts.map(([e, c]) => html`<span key=${e}>${e}${c > 1 ? " " + c : ""}</span>`)}
                   </div>`}
+                ${seen && html`<div class="seen">Görüldü</div>`}
               </div>`;
           })}
         ${pending.map((p) => html`
           <div class="mwrap mine" key=${"p" + p.id}>
-            <div class=${"bubble pending" + (p.failed ? " failed" : "")} onClick=${() => p.failed && deliver(p)}>
+            <div class=${"bubble" + (p.slow ? " pending" : "") + (p.failed ? " failed" : "")} onClick=${() => p.failed && deliver(p)}>
               <div class="txt">${p.text}</div>
-              <div class="time">${p.failed ? "❗ Gönderilemedi • Tekrar denemek için dokun" : "🕓 Gönderiliyor…"}</div>
+              <div class="time">${p.failed ? "❗ Gönderilemedi • Tekrar denemek için dokun" : p.slow ? "🕓" : "\u00a0"}</div>
             </div>
             ${p.failed && html`<button class="btn ghost small" onClick=${() => setPending((l) => l.filter((x) => x.id !== p.id))}>Vazgeç</button>`}
           </div>`)}

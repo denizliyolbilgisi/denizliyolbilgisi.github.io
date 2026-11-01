@@ -7,7 +7,7 @@ import * as api from "../api.js";
 import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, useInterval, useOnResume } from "../ui.js";
 import { MemberProfileModal } from "./profile.js";
 
-const MAX_LENGTH = 500;
+const MAX_LENGTH = 1024;
 
 const GROUP_RULES = `📍 Yol Durumu, Trafik ve Hava
 
@@ -388,7 +388,7 @@ export function ChatScreen({ roomId, focusId }) {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
         }}>${showEmoji ? "⌨️" : "😊"}</button>
-        <textarea class="input" rows="1" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
+        <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
           onFocus=${() => setShowEmoji(false)}
           onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           onKeyUp=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}

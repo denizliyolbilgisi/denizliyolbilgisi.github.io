@@ -1,7 +1,7 @@
 // Ayarlar: telefonun kendi ayarları gibi sade liste (Özel mesajlar • Bildirimler); ayrıntılar alt sayfada
 import { html, useState, useEffect, navigate, userMessage, isStillActive, remainingText, isStandalone, toast, roleBadge } from "../lib.js";
 import * as api from "../api.js";
-import { themePref, setThemePref } from "../theme.js";
+import { themePref, setThemePref, textLevel, setTextLevel, TEXT_NAMES } from "../theme.js";
 import { TopBar, Modal, Spinner, Switch, useInterval } from "../ui.js";
 import { APP_VERSION } from "../config.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
@@ -19,6 +19,7 @@ function statusText(until) {
 
 export function SettingsScreen() {
   const [theme, setTheme] = useState(themePref());
+  const [tsize, setTsize] = useState(textLevel());
   const [prefs, setPrefs] = useState(null);
   const [dm, setDm] = useState(null);
   const [rooms, setRooms] = useState(api.cachedRooms());
@@ -140,6 +141,18 @@ export function SettingsScreen() {
            ["light", "☀️", "#F59E0B", "Açık", null]].map(([v, ic, col, t, sub]) => html`
           <${Row} key=${v} icon=${ic} color=${col} title=${t} sub=${sub}
             value=${theme === v ? "✓" : ""} valueClass="g" onClick=${() => pickTheme(v)} />`)}
+      </div>
+      <div class="set-grp" style="margin-top:10px">
+        <div class="set-row" style="border-bottom:0;min-height:0;padding-bottom:0">
+          <div class="set-ic" style="background:#0891B2">🔠</div>
+          <div class="set-t"><b>Yazı boyutu</b><small>${TEXT_NAMES[tsize - 1]}</small></div>
+        </div>
+        <div class="ts-row">
+          ${[1, 2, 3, 4, 5].map((n) => html`
+            <button key=${n} class=${"ts-btn" + (tsize === n ? " on" : "")} style=${`font-size:${12 + n * 3}px`}
+              aria-label=${TEXT_NAMES[n - 1]} onClick=${() => { setTextLevel(n); setTsize(n); }}>A</button>`)}
+        </div>
+        <div class="ts-prev">Önizleme: Çamlık kavşağında kaza var, yavaş geçin.</div>
       </div>
 
       <div class="set-sec">ÖZEL MESAJLAR</div>

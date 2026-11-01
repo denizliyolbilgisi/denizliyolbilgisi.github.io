@@ -67,56 +67,58 @@ export function ProfileScreen() {
           ? html`<div class="center" style="padding:40px;gap:10px"><div class="msg err">${err}</div>
               <button class="btn outline" onClick=${() => setReload((x) => x + 1)}>Tekrar dene</button></div>`
           : html`<${Spinner} />`) : html`
-          <div class="card">
-            <div class="bold" style="font-size:26px">@${p.username || ""} ${roleBadge(p.role)}</div>
-            <div class="soft">${roleLabel(p.role)}</div>
-            <div class="soft small">Üyelik: ${dateText(p.created_at)}</div>
-            ${roomsAdmin.length > 0 && html`<div class="soft small">🔰 Oda yöneticisi: ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
-            ${p.email && html`<div style="margin-top:8px">📧 ${p.email}</div>
-              <div class="muted small">(E-postanı sadece sen ve yönetim görür)</div>`}
+          <div class="pr-head">
+            <div class="pr-av">${(p.username || "?").charAt(0).toUpperCase()}</div>
+            <div class="grow" style="min-width:0">
+              <div class="pr-name">@${p.username || ""} ${roleBadge(p.role)}</div>
+              <div class="pr-sub">${roleLabel(p.role)} • ${dateText(p.created_at)}'dan beri üye</div>
+              ${roomsAdmin.length > 0 && html`<div class="pr-sub">🔰 ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
+              ${p.bio && html`<div class="pr-bio">${p.bio}</div>`}
+            </div>
           </div>
 
-          <div class="card" style=${`background:var(--gold-box);border:2px solid ${GOLD}b3`}>
-            <div class="row">
-              <span style="font-size:44px">${r.icon}</span>
-              <div>
-                <div class="bold" style=${`font-size:26px;color:${GOLD}`}>${r.name}</div>
-                <div class="bold" style="font-size:18px">${p.points} DYB Puanı</div>
-              </div>
+          <button class="pr-rank" onClick=${() => setModal("leaders")}>
+            <div class="row" style="gap:8px">
+              <b class="grow" style="font-size:16px">${r.icon} ${r.name} • ${p.points} puan</b>
+              <span class="pr-rs">${p.month_position ? `Bu ay ${p.month_position}. sıradasın ›` : "Ayın ilk 10'u ›"}</span>
             </div>
             ${r.next_min && r.next_name ? html`
-              <div style="height:10px;border-radius:5px;background:rgba(var(--fg),.15);margin-top:12px;overflow:hidden">
-                <div style=${`height:100%;width:${Math.round(progress(p) * 100)}%;background:${GOLD}`}></div>
-              </div>
-              <div class="soft" style="margin-top:6px">Sonraki: ${r.next_icon || ""} ${r.next_name} • ${Math.max(0, r.next_min - p.points)} puan kaldı</div>`
-              : html`<div class="bold" style=${`color:${GOLD};margin-top:8px`}>🏆 En yüksek rütbedesin!</div>`}
-            <div style="margin-top:8px">Bu ay: ${p.month_points} puan${p.month_position ? ` • ${p.month_position}. sıradasın` : ""}</div>
-            <div class="row" style="margin-top:10px;gap:8px">
-              <button class="btn grow" style=${`background:${GOLD};color:#000`} onClick=${() => setModal("leaders")}>🏆 Ayın ilk 10'u</button>
-              <button class="btn grow outline" onClick=${() => setModal("rules")}>ℹ Puan nasıl?</button>
-            </div>
+              <div class="pr-bar"><div style=${`width:${Math.round(progress(p) * 100)}%`}></div></div>
+              <div class="pr-rs" style="margin-top:6px">${r.next_icon || ""} ${r.next_name}'na ${Math.max(0, r.next_min - p.points)} puan kaldı • Bu ay ${p.month_points} puan</div>`
+              : html`<div class="pr-rs" style="margin-top:6px">🏆 En yüksek rütbedesin! • Bu ay ${p.month_points} puan</div>`}
+          </button>
+
+          <div class="pr-stats">
+            ${[["Mesaj", p.message_count], ["Radar", p.radar_count], ["Onaylı", p.confirmed_count], ["Davet", invited.length]].map(([l, v]) => html`
+              <div class="pr-st" key=${l}><b>${v ?? 0}</b><span>${l}</span></div>`)}
           </div>
 
-          <div class="card">
-            <div class="row">
-              <div class="grow bold" style="font-size:20px">📝 Hakkımda</div>
-              <button class="btn ghost" onClick=${() => setModal("bio")}>✏️ Düzenle</button>
-            </div>
-            <div class=${p.bio ? "" : "soft"} style="font-size:17px">${p.bio || "Henüz bir şey yazmadın. Diğer üyeler profilinde bunu görür."}</div>
+          <div class="set-sec">HESAP</div>
+          <div class="set-grp">
+            ${[
+              ["👥", "#7C3AED", "Davetlerim", invited.length ? invited.length + " kişi" : "Davet kodu oluştur", () => navigate("/davetler")],
+              ["📝", "#2563EB", "Hakkımda", p.bio ? "" : "Yaz", () => setModal("bio")],
+              ["✏️", "#0EA5E9", "Kullanıcı adını değiştir", "", () => setModal("rename")],
+              ["🔑", "#0D9488", "Şifremi değiştir", "", () => setModal("password")],
+              ["ℹ️", "#D69E2E", "Puan nasıl kazanılır?", "", () => setModal("rules")],
+            ].map(([ic, col, t, v, fn]) => html`
+              <div class="set-row" key=${t} style="cursor:pointer" onClick=${fn}>
+                <div class="set-ic" style=${`background:${col}`}>${ic}</div>
+                <div class="set-t"><b>${t}</b></div>
+                ${v && html`<span class="set-v">${v}</span>`}
+                <span class="set-ch">›</span>
+              </div>`)}
+            ${p.email && html`
+              <div class="set-row">
+                <div class="set-ic" style="background:#475569">📧</div>
+                <div class="set-t"><b>E-posta</b><small>Sadece sen ve yönetim görür</small></div>
+                <span class="set-v" style="max-width:48%;overflow:hidden;text-overflow:ellipsis">${p.email}</span>
+              </div>`}
           </div>
 
-          <div class="card">
-            <div class="bold" style="font-size:20px">📊 İstatistiklerim</div>
-            ${[["💬 Mesaj", p.message_count], ["📍 Bildirdiğim radar", p.radar_count], ["✅ Onaylanan radarım", p.confirmed_count],
-              ["🤝 Davet ettiğim", invited.length]].map(([l, v]) => html`
-              <div class="row" key=${l} style="margin-top:6px"><span class="grow soft">${l}</span><b style="font-size:18px">${v ?? 0}</b></div>`)}
-            ${invited.length > 0 && html`<div class="soft small" style="margin-top:6px">${invited.map((x) => "@" + x).join("  ")}</div>`}
+          <div class="set-grp" style="margin-top:14px">
+            <div class="set-row pr-out" style="cursor:pointer" onClick=${() => setModal("logout")}>Çıkış yap</div>
           </div>
-
-          <button class="btn block big" style="background:#7B4DDB" onClick=${() => navigate("/davetler")}>👥 Davetlerim / Davet kodu oluştur</button>
-          <button class="btn block big" onClick=${() => setModal("rename")}>✏️ Kullanıcı adını değiştir</button>
-          <button class="btn block big teal" onClick=${() => setModal("password")}>🔑 Şifremi değiştir</button>
-          <button class="btn block big red" onClick=${() => setModal("logout")}>🚪 Çıkış yap</button>
         `}
       </div>
 
@@ -283,7 +285,7 @@ export function LeaderboardModal({ onClose }) {
               <div class="bold">@${r.username || ""}</div>
               <div class="muted small">${r.rank_icon || ""} ${r.rank_name || ""}</div>
             </div>
-            <b style=${`font-size:18px;color:${GOLD}`}>${r.points}</b>
+            <b style=${`font-size:18px;color:var(--gold)`}>${r.points}</b>
           </div>`)}
     </${Modal}>`;
 }
@@ -319,7 +321,7 @@ export function MemberProfileModal({ userId, onClose, onMessage }) {
         ${p.is_banned && html`<div style="color:var(--red-soft)">⛔ Hesabı askıda</div>`}
         <div class="row" style="background:var(--gold-box);border-radius:12px;padding:10px;margin-top:8px">
           <span style="font-size:32px">${r.icon}</span>
-          <div><div class="bold" style=${`font-size:19px;color:${GOLD}`}>${r.name}</div><div class="small">${p.points} DYB Puanı</div></div>
+          <div><div class="bold" style=${`font-size:19px;color:var(--gold)`}>${r.name}</div><div class="small">${p.points} DYB Puanı</div></div>
         </div>
         ${p.bio && html`<div style="margin-top:8px;font-size:17px">📝 ${p.bio}</div>`}
         <div class="soft small" style="margin-top:8px">Üyelik: ${dateText(p.created_at)}</div>
@@ -345,7 +347,7 @@ export function RankUpModal({ icon, name, onClose }) {
       <div class="center" style="gap:4px">
         <div style="font-size:64px">${icon}</div>
         <div>Yeni rütben:</div>
-        <div class="bold" style=${`font-size:28px;color:${GOLD}`}>${name}</div>
+        <div class="bold" style=${`font-size:28px;color:var(--gold)`}>${name}</div>
         <div class="soft small" style="margin-top:8px;text-align:center">Yola katkın için teşekkürler! Rütbeni Profil'de görebilirsin.</div>
       </div>
     </${Modal}>`;

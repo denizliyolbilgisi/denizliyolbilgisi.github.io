@@ -1,7 +1,7 @@
 // DYB iPhone sürümü – giriş noktası: cihaz kontrolü, oturum, ekranlar arası geçiş
 import {
   html, render, useState, useEffect, sb, isAppleMobile, isStandalone, isTestMode, store,
-  navigate, currentPath,
+  navigate, currentPath, toast,
 } from "./lib.js";
 import * as api from "./api.js";
 import { Toaster, Spinner } from "./ui.js";
@@ -95,6 +95,23 @@ function InstallGuide({ onSkip }) {
 // ---------------------------------------------------------------------------
 // Uygulama
 // ---------------------------------------------------------------------------
+/** 📡 İnternet yok ekranı: bağlantı gelince kendiliğinden kapanır */
+function OfflineScreen({ onRetry }) {
+  return html`
+    <div class="screen offline">
+      <div class="off-ic" aria-hidden="true">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 8.5a15 15 0 0 1 20 0"></path><path d="M5 12a10 10 0 0 1 14 0"></path><path d="M8.5 15.5a5 5 0 0 1 7 0"></path>
+          <circle cx="12" cy="19" r="1"></circle><path d="M3 3l18 18"></path>
+        </svg>
+      </div>
+      <h2>İnternet bağlantısı yok</h2>
+      <p>Wi-Fi veya mobil veri bağlantınızı kontrol edip tekrar deneyin.</p>
+      <button class="btn big" onClick=${onRetry}>🔄 Tekrar dene</button>
+      <p class="off-note">Bağlantı geldiğinde kaldığınız yerden devam edersiniz.</p>
+    </div>`;
+}
+
 function App() {
   const route = useRoute();
   const [deviceOk] = useState(() => isAppleMobile() || isTestMode());
@@ -103,6 +120,16 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [checked, setChecked] = useState(false);            // yasak / kullanıcı adı kontrolü yapıldı mı
   const [mustChange, setMustChange] = useState(false);      // geçici şifreyle girildi
+  // 📡 İnternet bağlantısı (Wi-Fi / mobil veri)
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
+  const [netGen, setNetGen] = useState(0);   // bağlantı gelince ekran baştan yüklensin
+  useEffect(() => {
+    const on = () => { setOnline((was) => { if (!was) setNetGen((g) => g + 1); return true; }); };
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   // Oturum
   useEffect(() => {
@@ -183,7 +210,14 @@ function App() {
     screen = html`<${MenuScreen} onBanned=${(p) => setProfile(p)} />`;
   }
 
-  return html`${screen}<${Toaster} />`;
+  if (!online) {
+    screen = html`<${OfflineScreen} onRetry=${() => {
+      if (navigator.onLine !== false) { setOnline(true); setNetGen((g) => g + 1); }
+      else toast("Hâlâ bağlantı yok. Wi-Fi veya mobil veriyi açıp tekrar dene.", 3500);
+    }} />`;
+  }
+
+  return html`<div key=${netGen} style="display:contents">${screen}</div><${Toaster} />`;
 }
 
 render(html`<${App} />`, document.getElementById("app"));
