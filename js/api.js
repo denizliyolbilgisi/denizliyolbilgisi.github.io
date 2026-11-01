@@ -137,6 +137,20 @@ export const roomUnmute = (room, user) => rpc("room_unmute", { p_room: room, p_u
 export const roomPin = (room, messageId) => rpc("room_pin", { p_room: room, p_message: messageId });
 export const roomSetDescription = (room, text) => rpc("room_set_description", { p_room: room, p_text: text });
 export const setRoomAdmin = (room, user, on) => rpc("admin_set_room_admin", { p_room: room, p_user: user, p_on: on });
+// ---------- 1.1.9: oda rütbeleri, sohbeti aç/kapat, Odalar sekmesi ----------
+export const SYSTEM_ID = "b0700000-0000-4000-8000-00000000d1b0";
+export const LEVELS = { sorumlu: ["🏅", "Oda Sorumlusu", 5], yetkili: ["🔰", "Oda Yetkilisi", 4], operator: ["🔹", "Operatör", 3] };
+export const levelOf = (room, userId) => {
+  const i = (room.admin_ids || []).indexOf(userId);
+  return i >= 0 ? ((room.admin_levels || [])[i] || "yetkili") : null;
+};
+export const roomLock = (room, minutes) => rpc("room_lock", { p_room: room, p_minutes: minutes });
+export const roomUnlock = (room) => rpc("room_unlock", { p_room: room });
+export const adminRooms = () => rpc("admin_rooms");
+export const adminRoomUpdate = (room, f) => rpc("admin_room_update", {
+  p_room: room, p_active: f.active ?? null, p_members_write: f.members_write ?? null,
+  p_notify: f.notify ?? null, p_name: f.name ?? null, p_description: f.description ?? null });
+export const adminSetRoomLevel = (room, user, level) => rpc("admin_set_room_level", { p_room: room, p_user: user, p_level: level || "" });
 
 /** Menüdeki "YENİ" işareti (sadece bu telefonda tutulur) */
 export function lastSeenId(roomId) {

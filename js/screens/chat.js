@@ -25,14 +25,17 @@ const GROUP_RULES = `📍 Yol Durumu, Trafik ve Hava
 
 🤝 DYB | Denizli Yol Bilgisi`;
 
-const ROOM_MUTE_OPTIONS = [[60, "1 saat"], [300, "5 saat"], [720, "12 saat"], [1440, "24 saat"]];
+const ROOM_MUTE_OPTIONS = [[30, "30 dakika"], [60, "1 saat"], [180, "3 saat"], [300, "5 saat"], [720, "12 saat"], [1440, "24 saat"]];
+const LOCK_OPTIONS = [[30, "30 dakika"], [60, "1 saat"], [180, "3 saat"], [null, "Ben açana kadar"]];
 
-function senderLabel(m, adminIds) {
+function senderLabel(m, room) {
   const name = m.profiles?.username;
   if (!name) return "Üye";
-  const badge = roleBadge(m.profiles?.role) || ((adminIds || []).includes(m.user_id) ? "🔰" : "");
+  const lv = api.levelOf(room, m.user_id);
+  const badge = roleBadge(m.profiles?.role) || (lv ? api.LEVELS[lv][0] : "");
   return badge ? `@${name} ${badge}` : `@${name}`;
 }
+const hhmm = (iso) => new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 
 /** Mesajdaki @etiketleri mavi ve kalın gösterir */
 function withMentions(text, color) {
@@ -111,9 +114,24 @@ export function ChatScreen({ roomId, focusId }) {
     lastTypingRef.current = now;
     api.setTyping("oda:" + roomId).catch(() => {});
   }
-  const powerOf = (m) => roleRank(m.profiles?.role) * 2 + ((room.admin_ids || []).includes(m.user_id) ? 1 : 0);
-  const label = (m) => senderLabel(m, room.admin_ids);
-  const canModerate = myPower >= 3;
+  const powerOf = (m) => Math.max(roleRank(m.profiles?.role) * 2, api.LEVELS[api.levelOf(room, m.user_id)]?.[2] || 0);
+  const label = (m) => senderLabel(m, room);
+  // Sabitle, açıklama, sohbeti aç/kapat: kurucu, yönetici, 🏅 sorumlu, 🔰 yetkili (sunucu söyler)
+  const canModerate = room.can_manage !== undefined ? !!room.can_manage : myPower >= 3;
+  const canWriteClosed = myPower >= 3;
+  // Odada en fazla susturma süresi: 🔹 1 sa, 🔰 3 sa, diğerleri 24 sa
+  const maxMute = rank >= 2 ? 1440 : ({ sorumlu: 1440, yetkili: 180, operator: 60 }[room.my_level] || 1440);
+  const [lockOpen, setLockOpen] = useState(false);
+  async function doLock(minutes) {
+    setLockOpen(false);
+    try {
+      if (room.closed) await api.roomUnlock(roomId); else await api.roomLock(roomId, minutes);
+      await loadRoom();
+      await loadMessages();
+    } catch (e) {
+      setError(userMessage(e));
+    }
+  }
   const isTraffic = roomId === "trafik";
 
   async function loadMessages() {
@@ -350,7 +368,13 @@ export function ChatScreen({ roomId, focusId }) {
           ${globalMuted ? "Bu sürede mesaj yazamazsın, sadece okuyabilirsin." : `Bu sürede ${room.icon} ${room.name} odasına yazamazsın; diğer odalara yazabilirsin.`}
         </div>
       </div>`;
-  } else if (room.read_only && !canModerate) {
+  } else if (room.closed && !canWriteClosed) {
+    bottom = html`
+      <div class="notice" style="background:var(--card-2)">
+        <div class="bold" style="font-size:17px">🔒 Bu oda şu an sohbete kapalı</div>
+        <div class="small soft" style="margin-top:4px">${room.closed_by_name ? "@" + room.closed_by_name + " kapattı" : "Yönetim kapattı"}${room.closed_until ? " • " + hhmm(room.closed_until) + "'da açılacak" : ""}</div>
+      </div>`;
+  } else if (room.read_only && myPower < 3) {
     bottom = html`<div class="notice" style="background:var(--card-2)">📢 Bu odaya sadece yöneticiler yazabilir.</div>`;
   } else {
     bottom = html`
@@ -410,12 +434,16 @@ export function ChatScreen({ roomId, focusId }) {
   return html`
     <div class="chat">
       <${TopBar} title=${`${room.icon} ${room.name}`} onBack=${() => navigate("/menu")}
-        sub=${typingText(typers)
+        sub=${(room.closed ? "🔒 Kapalı" + (room.closed_by_name ? " • @" + room.closed_by_name + " kapattı" : "") : null)
+          || typingText(typers)
           || [room.member_count ? `👥 ${room.member_count} üye` : null,
               room.online_count ? `🟢 ${room.online_count} çevrimiçi` : null].filter(Boolean).join(" • ")
           || ((room.description || "Basılı tut: Yanıtla / Sil") + (canModerate ? "  ✏️" : ""))}
         onSubClick=${canModerate ? () => setEditDesc(true) : null}
-        right=${html`<button class="btn ghost" onClick=${() => setRules({ text: rulesTextFor(room, isTraffic), key: null })}>Kurallar</button>`} />
+        right=${html`
+          ${canModerate && roomId !== "eczane" && html`<button class="btn ghost" style="font-size:22px;padding:6px 8px" aria-label=${room.closed ? "Sohbeti aç" : "Sohbeti kapat"}
+            onClick=${() => (room.closed ? doLock(null) : setLockOpen(true))}>${room.closed ? "🔓" : "🔒"}</button>`}
+          <button class="btn ghost" onClick=${() => setRules({ text: rulesTextFor(room, isTraffic), key: null })}>Kurallar</button>`} />
 
       ${room.pinned_message_id && room.pinned_text && html`
         <div class="pinned" ...${longPress(() => setShowPinned(true),
@@ -432,6 +460,11 @@ export function ChatScreen({ roomId, focusId }) {
           : messages.map((m, i) => {
             const mine = m.user_id === myId;
             const newDay = dayKey(m.created_at) !== dayKey(messages[i - 1]?.created_at);
+            if (m.user_id === api.SYSTEM_ID) {
+              return html`
+                ${newDay && html`<div class="day-chip" key=${"g" + m.id}><span>${dayLabel(m.created_at)}</span></div>`}
+                <div class="sys-line" id=${"m" + m.id} key=${m.id}><span>${m.content} • ${hhmm(m.created_at)}</span></div>`;
+            }
             const mentionsMe = !mine && (m.mention_all || (myName && api.mentionsIn(m.content).includes(myName)));
             const replied = m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : null;
             return html`
@@ -537,7 +570,13 @@ export function ChatScreen({ roomId, focusId }) {
           <p style="margin:0">"${api.previewText(deleteFor).slice(0, 80)}" silinsin mi?</p>
         </${Modal}>`}
 
-      ${muteFor && html`<${RoomMuteDialog} label=${label(muteFor)} room=${room} onClose=${() => setMuteFor(null)}
+      ${lockOpen && html`
+        <${Modal} title="🔒 Sohbeti kapat" onClose=${() => setLockOpen(false)}
+          actions=${html`<button class="btn outline" onClick=${() => setLockOpen(false)}>Vazgeç</button>`}>
+          <div class="soft" style="margin-bottom:8px">Kapalıyken üyeler yazamaz, sadece okur. Odada "🔒 Sohbet @${me?.username || ""} tarafından kapatıldı" yazar.</div>
+          ${LOCK_OPTIONS.map(([v, t]) => html`<button key=${t} class="list-btn" onClick=${() => doLock(v)}>⏱  ${t}</button>`)}
+        </${Modal}>`}
+      ${muteFor && html`<${RoomMuteDialog} label=${label(muteFor)} room=${room} max=${maxMute} onClose=${() => setMuteFor(null)}
           onMute=${async (minutes, reason) => {
             const m = muteFor;
             setMuteFor(null);
@@ -724,8 +763,8 @@ export function ReportDialog({ msg, label, onClose, onError, send = api.reportMe
     </${Modal}>`;
 }
 
-function RoomMuteDialog({ label, room, onClose, onMute, onUnmute }) {
-  const [minutes, setMinutes] = useState(60);
+function RoomMuteDialog({ label, room, max = 1440, onClose, onMute, onUnmute }) {
+  const [minutes, setMinutes] = useState(Math.min(60, max));
   const [reason, setReason] = useState("");
   return html`
     <${Modal} title="🔇 Bu odada sustur" onClose=${onClose}
@@ -735,7 +774,7 @@ function RoomMuteDialog({ label, room, onClose, onMute, onUnmute }) {
       ]}>
       <div class="soft">${label}, ${room.icon} ${room.name} odasına seçilen süre boyunca yazamaz. Diğer odalara yazabilir.</div>
       <div class="bold" style="margin-top:10px">Süre:</div>
-      ${ROOM_MUTE_OPTIONS.map(([v, t]) => html`
+      ${ROOM_MUTE_OPTIONS.filter(([v]) => v <= max).map(([v, t]) => html`
         <label class="choice" key=${v}><input type="radio" name="sure" checked=${minutes === v} onChange=${() => setMinutes(v)} />${t}</label>`)}
       <input class="input" maxlength="200" placeholder="Sebep (zorunlu)" value=${reason} onInput=${(e) => setReason(e.target.value)} />
     </${Modal}>`;

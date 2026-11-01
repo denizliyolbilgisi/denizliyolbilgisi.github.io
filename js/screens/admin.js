@@ -1,10 +1,10 @@
 // Yönetim: Üyeler (e-posta/süre sadece kurucu+yönetici), Şikayetler, Son İşlemler, oda yöneticisi atama
 import {
   html, useState, useEffect, navigate, userMessage, agoText, dateText, remainingText, isStillActive,
-  roleRank, roleLabel, durationText, parseTime, copyText, toast,
+  roleRank, roleLabel, roleBadge, durationText, parseTime, copyText, toast,
 } from "../lib.js";
 import * as api from "../api.js";
-import { TopBar, Modal, Spinner } from "../ui.js";
+import { TopBar, Modal, Spinner, Switch } from "../ui.js";
 
 const MUTE_OPTIONS = [["1 saat", 60], ["5 saat", 300], ["12 saat", 720], ["24 saat", 1440],
   ["15 gün", 15 * 1440], ["30 gün", 30 * 1440], ["Süresiz", null]];
@@ -76,6 +76,7 @@ export function AdminScreen({ startTab }) {
 
   const tabs = [["uyeler", "Üyeler"], ["sikayet", openCount > 0 ? `Şikayetler (${openCount})` : "Şikayetler"]];
   if (myRank >= 3) tabs.push(["talep", requestCount > 0 ? `🔑 Talepler (${requestCount})` : "🔑 Talepler"]);
+  if (myRank >= 3) tabs.push(["odalar", "🏠 Odalar"]);
   if (myRank >= 3) tabs.push(["islem", "Son İşlemler"]);
   const activeTab = tabs.some(([k]) => k === tab) ? tab : "uyeler";
   // En yeni Android sürümü: üyelerin kullandığı en yüksek sürüm
@@ -106,6 +107,8 @@ export function AdminScreen({ startTab }) {
         ${activeTab === "sikayet" && html`<${ReportsTab} myRank=${myRank} reload=${reload} onInfo=${setInfo}
             onChanged=${() => setReload((r) => r + 1)}
             onMute=${(r) => r.reported_id && setMuteTarget({ member: { id: r.reported_id, username: r.reported_name, role: r.reported_role }, reportId: r.id })} />`}
+
+        ${activeTab === "odalar" && html`<${RoomsTab} members=${members || []} myRank=${myRank} onInfo=${setInfo} />`}
 
         ${activeTab === "islem" && html`<${ActivityTab} user=${activityUser} reload=${reload} onClearUser=${() => setActivityUser(null)} onInfo=${setInfo} />`}
 
@@ -139,16 +142,7 @@ export function AdminScreen({ startTab }) {
               ${myRank >= 3 && roleRank(selected.role) < 4 && html`<button class="btn block teal" disabled=${working}
                 onClick=${() => { setResetTarget(selected); setSelected(null); }}>🔑  Şifreyi Yenile</button>`}
               ${myRank >= 3 && html`
-                <div class="bold" style="margin-top:6px">🔰 Oda yöneticiliği:</div>
-                <div class="muted small">Oda yöneticisi sadece kendi odasında mesaj silebilir, sabitleyebilir, 24 saate kadar susturabilir ve açıklamayı değiştirebilir.</div>
-                ${rooms.map((r) => {
-                  const on = (selected.room_admin_of || []).includes(r.id);
-                  return html`<button key=${r.id} class=${"btn block " + (on ? "red" : "green")} disabled=${working}
-                    onClick=${() => { const m = selected; setSelected(null);
-                      run(on ? `${name(m)} artık ${r.icon} ${r.name} oda yöneticisi değil.` : `${name(m)} artık ${r.icon} ${r.name} oda yöneticisi 🔰`,
-                        () => api.setRoomAdmin(r.id, m.id, !on)); }}>
-                    ${on ? `✖  ${r.icon} ${r.name}: Kaldır` : `🔰  ${r.icon} ${r.name}: Ata`}</button>`;
-                })}
+                <div class="muted small" style="margin-top:6px">🏅 🔰 🔹 Oda rütbeleri: Yönetim → 🏠 Odalar sekmesinden verilir.</div>
                 <div class="bold" style="margin-top:6px">Rol:</div>
                 ${ROLE_CHOICES.filter(([role]) => roleRank(role) < myRank && role !== selected.role).map(([role, label]) => html`
                   <button key=${role} class="btn block purple" disabled=${working} onClick=${() => { setRoleTarget({ m: selected, role }); setSelected(null); }}>${label}</button>`)}
@@ -226,7 +220,7 @@ export function AdminScreen({ startTab }) {
 function statusText(m) {
   let s = `Rol: ${roleLabel(m.role)}\nKatıldı: ${dateText(m.created_at)}\nDavet eden: ${m.invited_by ? "@" + m.invited_by : "-"}\nMesaj sayısı: ${m.message_count ?? 0}`;
   if (m.email) s += `\nE-posta: ${m.email}`;
-  if ((m.room_admin_of || []).length) s += `\n🔰 Oda yöneticisi: ${m.room_admin_of.map(roomName).join(", ")}`;
+  if ((m.room_admin_of || []).length) s += `\n🏠 Oda görevi: ${m.room_admin_of.map(roomName).join(", ")}`;
   if (isMuted(m)) s += `\n\n🔇 Susturuldu – kalan: ${remainingText(m.muted_until)}\nSebep: ${m.mute_reason || "-"}\nSusturan: ${m.muted_by ? "@" + m.muted_by : "-"}`;
   if (isBanned(m)) s += `\n\n⛔ Yasaklı\nSebep: ${m.ban_reason || "-"}\nYasaklayan: ${m.banned_by ? "@" + m.banned_by : "-"}`;
   return s;
@@ -246,7 +240,7 @@ function MemberCard({ m, showPrivate, latestCode, onClick }) {
       </div>
       <div class="soft small" style="margin-top:6px">Katıldı: ${dateText(m.created_at)} • Davet eden: ${m.invited_by ? "@" + m.invited_by : "-"}</div>
       <div class="soft small">Mesaj: ${m.message_count ?? 0} • Son mesaj: ${m.last_message_at ? agoText(m.last_message_at) : "yok"}</div>
-      ${(m.room_admin_of || []).length > 0 && html`<div class="small bold" style="color:var(--ok)">🔰 Oda yöneticisi: ${m.room_admin_of.map(roomName).join(", ")}</div>`}
+      ${(m.room_admin_of || []).length > 0 && html`<div class="small bold" style="color:var(--ok)">🏠 Oda görevi: ${m.room_admin_of.map(roomName).join(", ")}</div>`}
       ${showPrivate && html`
         ${m.email && html`<div class="soft small">✉️ ${m.email}</div>`}
         <div class="small" style="color:var(--blue-text)">⏱ Bugün ${durationText(m.usage_today)} • 7 gün ${durationText(m.usage_7d)} • Toplam ${durationText(m.usage_total)}</div>
@@ -461,4 +455,118 @@ function ActivityTab({ user, reload, onClearUser, onInfo }) {
           <div><b>${a.actor_name ? "@" + a.actor_name : "Sistem"}</b> ${a.summary}</div>
         </div>`)}
     ${more && html`<button class="btn block outline" disabled=${loadingMore} onClick=${loadMore}>${loadingMore ? "Yükleniyor…" : "Daha eski kayıtları yükle"}</button>`}`;
+}
+
+
+// =====================================================================
+// 🏠 Odalar: görünür / üyeler yazabilir / bildirim, ad ve amaç, sohbeti aç-kapat, oda rütbeleri
+// =====================================================================
+const LEVEL_CHOICES = [["sorumlu", "🏅 Oda Sorumlusu", "Sohbeti aç/kapat, sabitle, sil, 24 saate kadar sustur"],
+  ["yetkili", "🔰 Oda Yetkilisi", "Sohbeti aç/kapat, sabitle, sil, 3 saate kadar sustur"],
+  ["operator", "🔹 Operatör", "Mesaj sil, 1 saate kadar sustur"]];
+
+function RoomsTab({ members, myRank, onInfo }) {
+  const [rooms, setRooms] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState(null);       // oda: ad ve amaç
+  const [grant, setGrant] = useState(null);     // { room, user? }
+  const [lockFor, setLockFor] = useState(null);
+
+  async function load() {
+    try { setRooms(await api.adminRooms()); } catch (e) { onInfo({ err: true, text: userMessage(e) }); setRooms((r) => r || []); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function act(text, fn) {
+    setBusy(true);
+    try { await fn(); onInfo({ err: false, text }); await load(); }
+    catch (e) { onInfo({ err: true, text: userMessage(e) }); }
+    setBusy(false);
+  }
+
+  if (rooms === null) return html`<${Spinner} />`;
+  return html`
+    <div class="muted small" style="margin-bottom:8px">Oda rütbelerini sadece kurucu ve yönetici verir. Rütbe sadece o odada geçerlidir.</div>
+    ${rooms.map((r) => html`
+      <div class="card room-adm" key=${r.id} style=${r.active ? "" : "opacity:.7"}>
+        <div class="row" style="gap:8px">
+          <b class="grow" style="font-size:18px">${r.icon} ${r.name}</b>
+          ${r.closed && html`<span class="pill" style="background:#B45309">🔒 Kapalı</span>`}
+          ${!r.active && html`<span class="pill" style="background:#475569">Gizli</span>`}
+        </div>
+        ${r.description && html`<div class="soft small">${r.description}</div>`}
+        ${!r.can_edit ? html`<div class="muted small" style="margin-top:6px">Bu odayı sadece kurucu değiştirebilir.</div>` : html`
+          <${Switch} label="👁 Görünür (menüde çıksın)" checked=${r.active}
+            onChange=${(v) => act(`${r.name}: ${v ? "görünür" : "gizlendi"}`, () => api.adminRoomUpdate(r.id, { active: v }))} />
+          ${r.id !== "eczane" && r.id !== "hava" && html`<${Switch} label="✍️ Üyeler yazabilir" checked=${!r.read_only}
+            onChange=${(v) => act(`${r.name}: ${v ? "üyeler yazabilir" : "sadece yönetim yazar"}`, () => api.adminRoomUpdate(r.id, { members_write: v }))} />`}
+          <${Switch} label="🔔 Bildirim gönder" checked=${r.notify}
+            onChange=${(v) => act(`${r.name}: bildirim ${v ? "açık" : "kapalı"}`, () => api.adminRoomUpdate(r.id, { notify: v }))} />
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn outline small" disabled=${busy} onClick=${() => setEdit(r)}>✏️ Ad ve amaç</button>
+            ${r.id !== "eczane" && (r.closed
+              ? html`<button class="btn green small" disabled=${busy} onClick=${() => act(`${r.name} sohbete açıldı`, () => api.roomUnlock(r.id))}>🔓 Sohbeti aç</button>`
+              : html`<button class="btn orange small" disabled=${busy} onClick=${() => setLockFor(r)}>🔒 Sohbeti kapat</button>`)}
+          </div>
+          ${r.closed && html`<div class="muted small" style="margin-top:4px">${r.closed_by_name ? "@" + r.closed_by_name + " kapattı" : ""}${r.closed_until ? " • " + new Date(r.closed_until).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) + "'da açılacak" : ""}</div>`}
+          ${r.min_rank === 0 && html`
+            <div class="bold" style="margin-top:12px">Oda görevlileri</div>
+            ${(r.staff || []).length === 0 && html`<div class="muted small">Henüz görevli yok.</div>`}
+            ${(r.staff || []).map((x) => html`
+              <button class="list-btn" key=${x.user_id} onClick=${() => setGrant({ room: r, user: x })}>
+                ${api.LEVELS[x.level]?.[0] || ""} @${x.username} <span class="muted small">• ${api.LEVELS[x.level]?.[1] || ""}</span></button>`)}
+            <button class="btn small" style="margin-top:6px" disabled=${busy} onClick=${() => setGrant({ room: r })}>➕ Görevli ekle</button>`}
+        `}
+      </div>`)}
+
+    ${edit && html`<${RoomEditDialog} room=${edit} onClose=${() => setEdit(null)}
+        onSave=${(name, description) => { const r = edit; setEdit(null); act(`${r.icon} ${name} kaydedildi`, () => api.adminRoomUpdate(r.id, { name, description })); }} />`}
+    ${lockFor && html`
+      <${Modal} title=${`🔒 ${lockFor.name}: sohbeti kapat`} onClose=${() => setLockFor(null)}
+        actions=${html`<button class="btn outline" onClick=${() => setLockFor(null)}>Vazgeç</button>`}>
+        ${[[30, "30 dakika"], [60, "1 saat"], [180, "3 saat"], [null, "Ben açana kadar"]].map(([v, t]) => html`
+          <button key=${t} class="list-btn" onClick=${() => { const r = lockFor; setLockFor(null); act(`${r.name} sohbete kapatıldı`, () => api.roomLock(r.id, v)); }}>⏱  ${t}</button>`)}
+      </${Modal}>`}
+    ${grant && html`<${GrantDialog} room=${grant.room} user=${grant.user} members=${members} myRank=${myRank} onClose=${() => setGrant(null)}
+        onPick=${(userId, uname, level) => { const r = grant.room; setGrant(null);
+          act(level ? `@${uname}: ${r.name} odasında ${api.LEVELS[level][1]}` : `@${uname}: ${r.name} görevi kaldırıldı`,
+            () => api.adminSetRoomLevel(r.id, userId, level)); }} />`}`;
+}
+
+function RoomEditDialog({ room, onClose, onSave }) {
+  const [name, setName] = useState(room.name);
+  const [desc, setDesc] = useState(room.description || "");
+  return html`
+    <${Modal} title=${`✏️ ${room.icon} Oda adı ve amacı`} onClose=${onClose}
+      actions=${[
+        html`<button class="btn outline" onClick=${onClose}>Vazgeç</button>`,
+        html`<button class="btn" disabled=${name.trim().length < 2} onClick=${() => onSave(name.trim(), desc.trim())}>Kaydet</button>`,
+      ]}>
+      <div class="bold">Oda adı</div>
+      <input class="input" maxlength="40" value=${name} onInput=${(e) => setName(e.target.value)} />
+      <div class="bold" style="margin-top:10px">Amacı (menüde ve oda başlığında görünür)</div>
+      <input class="input" maxlength="200" value=${desc} placeholder="Örn: Radar • çevirme • yol yardım" onInput=${(e) => setDesc(e.target.value)} />
+    </${Modal}>`;
+}
+
+function GrantDialog({ room, user, members, myRank, onClose, onPick }) {
+  const [q, setQ] = useState("");
+  const [who, setWho] = useState(user ? { id: user.user_id, username: user.username } : null);
+  const t = q.trim().replace(/^@/, "").toLowerCase();
+  const hits = !who && t.length >= 2
+    ? members.filter((m) => m.username && m.username.includes(t) && roleRank(m.role) < myRank).slice(0, 8) : [];
+  return html`
+    <${Modal} title=${`${room.icon} ${room.name}: oda görevi`} onClose=${onClose}
+      actions=${html`<button class="btn outline" onClick=${onClose}>Vazgeç</button>`}>
+      ${!who ? html`
+        <input class="input" placeholder="🔍 Üye ara (en az 2 harf)" value=${q} autocapitalize="off" onInput=${(e) => setQ(e.target.value)} />
+        ${hits.map((m) => html`<button key=${m.id} class="list-btn" onClick=${() => setWho(m)}>@${m.username} ${roleBadge(m.role)}</button>`)}
+        ${t.length >= 2 && hits.length === 0 && html`<div class="muted small" style="margin-top:6px">Üye bulunamadı.</div>`}`
+      : html`
+        <div class="bold" style="font-size:18px;margin-bottom:6px">@${who.username}</div>
+        ${LEVEL_CHOICES.map(([lv, t2, d]) => html`
+          <button key=${lv} class="list-btn" onClick=${() => onPick(who.id, who.username, lv)}>
+            ${t2}${user && user.level === lv ? "  ✓" : ""}<div class="muted small">${d}</div></button>`)}
+        ${user && html`<button class="list-btn" style="color:var(--red-soft)" onClick=${() => onPick(who.id, who.username, null)}>✖  Görevi kaldır</button>`}`}
+    </${Modal}>`;
 }

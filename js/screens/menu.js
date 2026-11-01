@@ -11,11 +11,14 @@ const ROOM_COLORS = {
   is_ilanlari: ["#26A69A", "#00796B"],
   alim_satim: ["#EC407A", "#AD1457"],
   eczane: ["#22C55E", "#15803D"],
-  yonetim: ["#8B5CF6", "#6D28D9"],
+  dyt_sohbet: ["#8B5CF6", "#6D28D9"],
+  yonetim: ["#475569", "#1E293B"],
 };
 
 // Ana menü kutularının sırası: 🚦 💊 💼 🛒 … 🛡
-const TILE_ORDER = { trafik: 1, eczane: 2, is_ilanlari: 3, alim_satim: 4, yonetim: 99 };
+const TILE_ORDER = { trafik: 1, eczane: 2, dyt_sohbet: 3, is_ilanlari: 4, alim_satim: 5, yonetim: 99 };
+// Kutu zemin tonu (açık / koyu tema CSS'te)
+const TILE_TINT = { trafik: "amber", eczane: "green", dyt_sohbet: "purple", is_ilanlari: "teal", alim_satim: "pink", yonetim: "slate" };
 
 function MenuCard({ icon, colors, title, line, live, liveColor, unread, count = 0, onClick }) {
   return html`
@@ -168,7 +171,7 @@ export function MenuScreen({ onBanned }) {
   const greet = h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
   const tileSub = (r) => {
     if (isStillActive(r.muted_until) && rank < 4) return "🔇 Susturuldun";
-    if (r.id === "eczane") return "Ara • Harita • Yol tarifi";
+    if (r.id === "eczane") return "Her gün güncel liste";
     if (r.last_at) return "Son: " + agoText(r.last_at);
     return roomsLoaded ? "Henüz mesaj yok" : chatError ? "Bilgi alınamadı" : "Yükleniyor…";
   };
@@ -199,22 +202,30 @@ export function MenuScreen({ onBanned }) {
           <button class="btn white small" onClick=${turnOnPush}>Aç</button>
         </div>`}
 
+      <button class="home-hero" onClick=${() => navigate("/harita")}>
+        <span class="hh-ic">🗺</span>
+        <span class="grow" style="min-width:0">
+          <span class="hh-t">Harita</span>
+          <span class="hh-d">Radar • kaza • yol durumu</span>
+          <span class="hh-live">● ${radarText}</span>
+        </span>
+        <span class="hh-c">›</span>
+      </button>
+
       <div class="home-grid" data-tick=${tick}>
-        <button class="htile" onClick=${() => navigate("/harita")}>
-          <span class="hic" style="background:linear-gradient(135deg,#3D8BFF,#1E5FD1)">🗺</span>
-          <span class="htt">Harita</span>
-          <span class="hts">${radarText}</span>
-        </button>
         ${[...rooms].sort((a, b) => (TILE_ORDER[a.id] ?? 50 + a.sort_order) - (TILE_ORDER[b.id] ?? 50 + b.sort_order)).map((r) => {
           const n = roomUnread[r.id] || 0;
           const unread = r.id !== "eczane" && (api.hasUnread(r, me?.username) || n > 0);
-          const col = ROOM_COLORS[r.id] || ["#7E57C2", "#512DA8"];
+          const col = ROOM_COLORS[r.id] || ["#0EA5E9", "#0369A1"];
+          const live = tileSub(r);
+          const quiet = !r.last_at && r.id !== "eczane";
           return html`
-            <button key=${r.id} class=${"htile" + (unread ? " unread" : "")} onClick=${() => navigate("/oda/" + r.id)}>
+            <button key=${r.id} class=${"htile t-" + (TILE_TINT[r.id] || "sky") + (unread ? " unread" : "")} onClick=${() => navigate("/oda/" + r.id)}>
               ${unread && html`<span class="hbadge">${n >= 99 ? "99+" : n > 0 ? n : ""} yeni</span>`}
               <span class="hic" style=${`background:linear-gradient(135deg,${col[0]},${col[1]})`}>${r.icon}</span>
               <span class="htt">${r.name}</span>
-              <span class="hts">${tileSub(r)}</span>
+              ${r.description && html`<span class="htd">${r.description}</span>`}
+              <span class=${"hlive" + (quiet ? " q" : "") + (r.closed ? " lock" : "")}><i></i>${r.closed ? "🔒 Sohbet kapalı" : live}</span>
             </button>`;
         })}
       </div>
