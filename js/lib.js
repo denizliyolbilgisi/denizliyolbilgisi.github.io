@@ -5,8 +5,17 @@ export {
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 
 // Supabase (vendor/supabase.js sayfada önceden yüklenir)
+// 1.1.2.0: cevap gelmeyen istek 15 sn sonra kesilir (arka plandan dönünce takılmasın)
+function timedFetch(input, init = {}) {
+  if (init.signal) return fetch(input, init);   // kendi iptali olan isteğe dokunma
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  return fetch(input, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
 export const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  global: { fetch: timedFetch },
 });
 
 // ---------------------------------------------------------------------------
@@ -291,4 +300,13 @@ export function presenceText(online, lastSeen) {
 export function typingText(names) {
   if (!names || !names.length) return null;
   return names.length === 1 ? `✍️ @${names[0]} yazıyor…` : `✍️ @${names[0]} ve ${names.length - 1} kişi yazıyor…`;
+}
+
+// 1.1.2.0: karakter sayısı sunucudaki gibi (emoji = 1)
+export function charCount(s) {
+  return [...(s || "")].length;
+}
+export function takeChars(s, max) {
+  const a = [...(s || "")];
+  return a.length <= max ? s : a.slice(0, max).join("");
 }

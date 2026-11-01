@@ -1,5 +1,5 @@
 // Özel mesajlar: gelen kutusu ve birebir sohbet
-import { html, useState, useEffect, useRef, navigate, userMessage, chatTime, roleBadge, toast, copyText, dayKey, dayLabel, typingText, presenceText } from "../lib.js";
+import { html, useState, useEffect, useRef, navigate, userMessage, chatTime, roleBadge, toast, copyText, dayKey, dayLabel, typingText, presenceText, charCount, takeChars } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume, useLive } from "../ui.js";
 import { MemberProfileModal } from "./profile.js";
@@ -228,7 +228,7 @@ export function DmChatScreen({ userId }) {
     const start = c ? Math.min(c[0], input.length) : input.length;
     const end = c ? Math.min(c[1], input.length) : input.length;
     const next = input.slice(0, start) + emoji + input.slice(end);
-    if (next.length > MAX_LENGTH) return;
+    if (charCount(next) > MAX_LENGTH) return;
     setInput(next);
     caretRef.current = [start + emoji.length, start + emoji.length];
   }
@@ -299,19 +299,27 @@ export function DmChatScreen({ userId }) {
           <div class="grow small bold" style="color:var(--yellow)">✏️ Mesajını düzenliyorsun</div>
           <button class="btn ghost" onClick=${() => { setEditing(null); setInput(""); caretRef.current = null; }}>✕</button>
         </div>`}
+      ${charCount(input) >= 700 && html`<div class=${"len-count" + (charCount(input) >= MAX_LENGTH ? " full" : "")}>${charCount(input)} / ${MAX_LENGTH}</div>`}
       <div class="composer">
         <button class="emo" disabled=${sending} onClick=${() => {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
         }}>${showEmoji ? "⌨️" : "😊"}</button>
-        <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
+        <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" value=${input} ref=${inputRef}
           placeholder=${editing ? "Mesajını düzelt..." : "Mesaj yaz..."}
           onFocus=${() => setShowEmoji(false)}
           onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           onKeyUp=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           onInput=${(e) => {
-            if (e.target.value.length > input.length) typingPing();
-            setInput(e.target.value);
+            let v = e.target.value;
+            if (charCount(v) > MAX_LENGTH) {
+              // Uzun metin yapıştırıldı: kaybolmasın, sığan kısmı alınır
+              v = takeChars(v, MAX_LENGTH);
+              e.target.value = v;
+              toast(`Mesaj en fazla ${MAX_LENGTH} karakter olabilir, fazlası kesildi.`);
+            }
+            if (v.length > input.length) typingPing();
+            setInput(v);
             caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";

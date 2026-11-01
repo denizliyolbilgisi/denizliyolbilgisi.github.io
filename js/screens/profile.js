@@ -3,7 +3,7 @@ import {
   html, useState, useEffect, navigate, userMessage, dateText, roleBadge, roleLabel, toast, cleanUsername, usernameLocalError,
 } from "../lib.js";
 import * as api from "../api.js";
-import { TopBar, Modal, Spinner } from "../ui.js";
+import { TopBar, Modal, Spinner, useOnResume } from "../ui.js";
 import { disablePush } from "../push.js";
 
 const GOLD = "#FFC94D";
@@ -54,6 +54,7 @@ export function ProfileScreen() {
   useEffect(() => {
     api.myProfile().then((x) => { setP(x); setErr(null); }).catch((e) => setErr(userMessage(e, "Profil yüklenemedi.")));
   }, [reload]);
+  useOnResume(() => setReload((x) => x + 1));   // uygulamaya dönünce yenile
 
   const r = rankOf(p);
   const invited = (p?.invited || []).filter(Boolean);

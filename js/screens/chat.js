@@ -1,7 +1,7 @@
 // Sohbet odası: mesajlar, yanıt, fotoğraf albümü, şikayet, sabit mesaj, oda yöneticisi araçları
 import {
   html, useState, useEffect, useRef, useLayoutEffect, navigate, userMessage, chatTime, remainingText, isStillActive,
-  roleRank, roleBadge, toast, copyText, store, dayKey, dayLabel, typingText,
+  roleRank, roleBadge, toast, copyText, store, dayKey, dayLabel, typingText, charCount, takeChars,
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, useInterval, useOnResume } from "../ui.js";
@@ -303,7 +303,7 @@ export function ChatScreen({ roomId, focusId }) {
     const start = c ? Math.min(c[0], input.length) : input.length;
     const end = c ? Math.min(c[1], input.length) : input.length;
     const next = input.slice(0, start) + emoji + input.slice(end);
-    if (next.length > MAX_LENGTH) return;
+    if (charCount(next) > MAX_LENGTH) return;
     setInput(next);
     const pos = start + emoji.length;
     caretRef.current = [pos, pos];
@@ -345,7 +345,7 @@ export function ChatScreen({ roomId, focusId }) {
             <button key=${c.username} class="mention-btn"
               onClick=${() => {
                 const start = input.length - typing[1].length - 1;
-                setInput((input.slice(0, start) + "@" + c.username + " ").slice(0, MAX_LENGTH)); caretRef.current = null;
+                setInput(takeChars(input.slice(0, start) + "@" + c.username + " ", MAX_LENGTH)); caretRef.current = null;
               }}>
               ${c.username === "herkes" ? "📣 @herkes  (odadaki herkese duyuru)" : `@${c.username} ${roleBadge(c.role)}`}
             </button>`)}
@@ -406,20 +406,28 @@ export function ChatScreen({ roomId, focusId }) {
         </div>`}
       ${progress && html`<div class="small" style="padding:4px 16px;color:var(--blue-2)">${progress}</div>`}
       ${mentionBox}
+      ${charCount(input) >= 700 && html`<div class=${"len-count" + (charCount(input) >= MAX_LENGTH ? " full" : "")}>${charCount(input)} / ${MAX_LENGTH}</div>`}
       <div class="composer">
         <button class="cam" disabled=${sending || !!editing || picked.length >= api.MAX_PHOTOS} onClick=${() => setPhotoSource(true)}>📷</button>
         <button class="emo" disabled=${sending} onClick=${() => {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
         }}>${showEmoji ? "⌨️" : "😊"}</button>
-        <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" maxlength=${MAX_LENGTH} value=${input} ref=${inputRef}
+        <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" value=${input} ref=${inputRef}
           onFocus=${() => setShowEmoji(false)}
           onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           onKeyUp=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
           placeholder=${editing ? "Mesajını düzelt..." : picked.length ? "Açıklama ekle (isteğe bağlı)" : replyTo ? "Yanıtını yaz..." : "Mesaj yaz..."}
           onInput=${(e) => {
-            if (e.target.value.length > input.length) typingPing();
-            setInput(e.target.value);
+            let v = e.target.value;
+            if (charCount(v) > MAX_LENGTH) {
+              // Uzun metin yapıştırıldı: kaybolmasın, sığan kısmı alınır
+              v = takeChars(v, MAX_LENGTH);
+              e.target.value = v;
+              toast(`Mesaj en fazla ${MAX_LENGTH} karakter olabilir, fazlası kesildi.`);
+            }
+            if (v.length > input.length) typingPing();
+            setInput(v);
             caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";

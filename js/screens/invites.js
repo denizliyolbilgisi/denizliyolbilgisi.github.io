@@ -1,7 +1,7 @@
 // Davetlerim: davet kodu üret, paylaş, kopyala, sil
 import { html, useState, useEffect, navigate, userMessage, agoText, roleRank, toast, copyText, parseTime } from "../lib.js";
 import * as api from "../api.js";
-import { TopBar, Modal, Spinner, useInterval } from "../ui.js";
+import { TopBar, Modal, Spinner, useInterval, useOnResume } from "../ui.js";
 
 const SITE = "https://denizliyolbilgisi.github.io";
 
@@ -28,13 +28,14 @@ export function InvitesScreen() {
       setMe(p);
     } catch (e) {
       setMsg({ err: true, text: "Kodlar yüklenemedi: " + userMessage(e) });
-      setCodes([]);
+      setCodes((c) => c || []);
     }
   }
   useEffect(() => {
     load();
     api.refreshConfig().catch(() => {});
   }, []);
+  useOnResume(load);   // uygulamaya dönünce yenile
   useInterval(() => setTick((t) => t + 1), 30000);
 
   const rank = roleRank(me?.role);
@@ -115,8 +116,9 @@ export function InvitesScreen() {
             ? "Yetkili (moderatör / yönetici) olarak beklemeden sınırsız davet kodu üretebilirsin. Her kod tek kullanımlıktır."
             : `DYB'ye yalnızca davetle üye olunur. Güvendiğin kişilere kod oluştur. Her kod tek kullanımlıktır ve ${waitH} saatte bir yeni kod üretebilirsin. Yeni üyeler kayıttan sonraki ilk ${newH} saat kod üretemez.`}
         </div>
-        <button class="btn block big green" disabled=${busy || !me || !!nextAllowed} onClick=${create}>
-          ${busy ? html`<${Spinner} small />` : !me ? "Yükleniyor…" : nextAllowed ? `Sonraki kod: ${waitText(nextAllowed - Date.now())} sonra` : "＋ Yeni Davet Kodu Oluştur"}
+        <button class="btn block big green" disabled=${busy || (!me && !msg?.err) || !!nextAllowed}
+          onClick=${() => (me ? create() : (setMsg(null), load()))}>
+          ${busy ? html`<${Spinner} small />` : !me ? (msg?.err ? "🔄 Tekrar dene" : "Yükleniyor…") : nextAllowed ? `Sonraki kod: ${waitText(nextAllowed - Date.now())} sonra` : "＋ Yeni Davet Kodu Oluştur"}
         </button>
         ${msg && html`<div class=${"msg " + (msg.err ? "err" : "ok")}>${msg.text}</div>`}
         ${helps.length > 0 && html`

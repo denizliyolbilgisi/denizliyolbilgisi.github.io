@@ -124,6 +124,8 @@ export const FALLBACK_ROOMS = [
 
 let roomsCache = FALLBACK_ROOMS;
 export const cachedRooms = () => roomsCache;
+/** Sunucudan gerçek oda listesi alındı mı (yedek liste değil) */
+export const hasRealRooms = () => roomsCache !== FALLBACK_ROOMS;
 export const cachedRoom = (id) => roomsCache.find((r) => r.id === id) ?? FALLBACK_ROOMS.find((r) => r.id === id) ?? FALLBACK_ROOMS[0];
 
 export async function roomsOverview() {

@@ -415,7 +415,7 @@ textarea.input { resize: none; }
 
 /* ---- 1.1.5: sade Ayarlar ---- */
 .set-wrap { padding: 4px 14px calc(var(--safe-bottom) + 24px); }
-.set-sec { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .6px; padding: 16px 8px 6px; }
+.set-sec { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0; padding: 16px 8px 6px; }
 .set-grp { background: var(--card); border-radius: 16px; overflow: hidden; }
 .set-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 54px; border-bottom: 1px solid var(--line-2); }
 .set-row:last-child { border-bottom: 0; }
@@ -581,3 +581,9 @@ textarea.input { resize: none; }
 .room-adm .switch-row { margin-top: 6px; }
 .room-adm .list-btn { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid rgba(var(--fg), .07);
   padding: 10px 2px; font: inherit; font-size: 17px; color: var(--text); cursor: pointer; }
+/* 1.1.2.0: mesaj uzunluk sayacı */
+.len-count { text-align: right; font-size: 13px; font-weight: 600; color: var(--muted); padding: 2px 14px 0; }
+.len-count.full { color: #DC2626; }
+/* 1.1.2.0: ilk açılışta yer tutan gri kutular */
+.htile.skel { background: #1E2733; border-color: transparent; box-shadow: none; pointer-events: none; }
+:root[data-theme=light] .htile.skel { background: #E3E8EF; }

@@ -76,7 +76,7 @@ export function AdminScreen({ startTab }) {
 
   const tabs = [["uyeler", "Üyeler"], ["sikayet", openCount > 0 ? `Şikayetler (${openCount})` : "Şikayetler"]];
   if (myRank >= 3) tabs.push(["talep", requestCount > 0 ? `🔑 Talepler (${requestCount})` : "🔑 Talepler"]);
-  if (myRank >= 3) tabs.push(["odalar", "🏠 Odalar"]);
+  if (myRank >= 4) tabs.push(["odalar", "🏠 Odalar"]);   // 1.1.2.0: sadece kurucu
   if (myRank >= 3) tabs.push(["islem", "Son İşlemler"]);
   const activeTab = tabs.some(([k]) => k === tab) ? tab : "uyeler";
   // En yeni Android sürümü: üyelerin kullandığı en yüksek sürüm
@@ -142,7 +142,7 @@ export function AdminScreen({ startTab }) {
               ${myRank >= 3 && roleRank(selected.role) < 4 && html`<button class="btn block teal" disabled=${working}
                 onClick=${() => { setResetTarget(selected); setSelected(null); }}>🔑  Şifreyi Yenile</button>`}
               ${myRank >= 3 && html`
-                <div class="muted small" style="margin-top:6px">🏅 🔰 🔹 Oda rütbeleri: Yönetim → 🏠 Odalar sekmesinden verilir.</div>
+                ${myRank >= 4 && html`<div class="muted small" style="margin-top:6px">🏅 🔰 🔹 Oda rütbeleri: Yönetim → 🏠 Odalar sekmesinden verilir.</div>`}
                 <div class="bold" style="margin-top:6px">Rol:</div>
                 ${ROLE_CHOICES.filter(([role]) => roleRank(role) < myRank && role !== selected.role).map(([role, label]) => html`
                   <button key=${role} class="btn block purple" disabled=${working} onClick=${() => { setRoleTarget({ m: selected, role }); setSelected(null); }}>${label}</button>`)}

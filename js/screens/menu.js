@@ -15,8 +15,8 @@ const ROOM_COLORS = {
   yonetim: ["#475569", "#1E293B"],
 };
 
-// Ana menü kutularının sırası: 🚦 💊 💼 🛒 … 🛡
-const TILE_ORDER = { trafik: 1, eczane: 2, dyt_sohbet: 3, is_ilanlari: 4, alim_satim: 5, yonetim: 99 };
+// 1.1.2.0 düzeni: Trafik - Sohbet / İş İlanları - Alım-Satım / Eczane - Yönetim
+const TILE_ORDER = { trafik: 1, dyt_sohbet: 2, is_ilanlari: 3, alim_satim: 4, eczane: 5, yonetim: 6 };
 // Kutu zemin tonu (açık / koyu tema CSS'te)
 const TILE_TINT = { trafik: "amber", eczane: "green", dyt_sohbet: "purple", is_ilanlari: "teal", alim_satim: "pink", yonetim: "slate" };
 
@@ -42,15 +42,20 @@ function Tile({ icon, label, color, count, onClick }) {
 }
 
 export function MenuScreen({ onBanned }) {
+  // Son görülen ana ekran telefonda saklı: açılışta her şey tek seferde gelir
+  const cacheKey = "dyb_menu_" + (api.myId() || "");
+  const [disk] = useState(() => store.get(cacheKey, null));
+  const saveDisk = (part) => store.set(cacheKey, { ...(store.get(cacheKey, null) || {}), ...part });
   const [me, setMe] = useState(null);
-  const [rooms, setRooms] = useState(api.cachedRooms());
+  const [rooms, setRooms] = useState(() => (!api.hasRealRooms() && disk?.rooms?.length ? disk.rooms : api.cachedRooms()));
+  const [roomsReady, setRoomsReady] = useState(() => api.hasRealRooms() || !!disk?.rooms?.length);   // false: iskelet kutular
   const [roomsLoaded, setRoomsLoaded] = useState(false);
   const [chatError, setChatError] = useState(false);
   const [radars, setRadars] = useState(null);
   const [radarError, setRadarError] = useState(false);
   const [openReports, setOpenReports] = useState(0);
   const [dmUnread, setDmUnread] = useState(0);         // okunmamış özel mesaj
-  const [roomUnread, setRoomUnread] = useState({});     // oda başına okunmamış
+  const [roomUnread, setRoomUnread] = useState(() => disk?.unread || {});     // oda başına okunmamış
   const [announcement, setAnnouncement] = useState({ text: "", warn: false });
   const [tick, setTick] = useState(0);
   const [rankUp, setRankUp] = useState(null);   // { icon, name }
@@ -71,6 +76,7 @@ export function MenuScreen({ onBanned }) {
       }
       retry.current = 0;
       setMe(p);
+      if (p.username && p.username !== disk?.username) saveDisk({ username: p.username });
       const rk = roleRank(p.role);
       if (rk !== knownRank) {
         setKnownRank(rk);
@@ -93,13 +99,9 @@ export function MenuScreen({ onBanned }) {
     }).catch(() => {
       if (retry.current++ < 6) setTimeout(refresh, 5000);
     });
-    api.roomsOverview().then((list) => {
-      if (list.length) setRooms(list);
-      setRoomsLoaded(true);
-      setChatError(false);
-    }).catch(() => setChatError(true));
     api.nearbyRadars(DENIZLI.lat, DENIZLI.lng, FETCH_RADIUS_M).then((l) => {
       setRadars(l || []);
+      saveDisk({ radarCount: (l || []).length });
       setRadarError(false);
     }).catch(() => setRadarError(true));
     api.refreshConfig().then(() => {
@@ -118,11 +120,20 @@ export function MenuScreen({ onBanned }) {
   // Hafif yenileme: odalar, okunmamış sayıları, özel mesaj rozeti
   async function liveRefresh() {
     try {
-      const list = await api.roomsOverview();
-      if (list.length) setRooms(list);
+      const fresh = await api.roomsOverview();
+      const list = fresh.length ? fresh : rooms;
+      // Okunmamış sayıları da gelsin, sonra ikisi birlikte ekrana yansısın
+      const unread = await api.roomUnreadCounts(list).catch(() => roomUnread);
+      setRooms(list);
+      setRoomUnread(unread || {});
+      setRoomsLoaded(true);
+      setRoomsReady(true);
       setChatError(false);
-      setRoomUnread(await api.roomUnreadCounts(list.length ? list : rooms));
-    } catch (_) { /* */ }
+      if (fresh.length) saveDisk({ rooms: fresh, unread: unread || {} });
+    } catch (_) {
+      setChatError(true);
+      setRoomsReady(true);   // bağlantı yoksa yedek liste görünsün
+    }
     api.dmUnreadTotal().then((n) => setDmUnread(n || 0)).catch(() => {});
   }
 
@@ -131,12 +142,13 @@ export function MenuScreen({ onBanned }) {
   useLive((kind) => { if (kind === "radar") refresh(); else liveRefresh(); });
   useInterval(liveRefresh, 15000);
   useInterval(() => { refresh(); setTick((t) => t + 1); }, 30000);
-  useOnResume(refresh);
+  useOnResume(() => { refresh(); liveRefresh(); });
 
   // Harita kartı
   const lastRadar = radars && radars.length
     ? radars.reduce((a, b) => ((a.created_at || "") > (b.created_at || "") ? a : b)) : null;
-  const radarText = radars ? (radars.length ? `${radars.length} aktif bildirim` : "Şu an aktif bildirim yok")
+  const radarN = radars ? radars.length : disk?.radarCount ?? null;
+  const radarText = radarN !== null ? (radarN ? `${radarN} aktif bildirim` : "Şu an aktif bildirim yok")
     : radarError ? "Harita bilgisi alınamadı" : "Yükleniyor…";
   const radarLine = lastRadar
     ? ["Son: " + api.radarType(lastRadar.type).emoji + " " + api.radarType(lastRadar.type).label, lastRadar.place, agoText(lastRadar.created_at)].filter(Boolean).join(" • ")
@@ -182,7 +194,7 @@ export function MenuScreen({ onBanned }) {
         <div class="badge home-logo">DYB</div>
         <div class="grow" style="min-width:0">
           <div class="home-title">Denizli Yol Bilgisi</div>
-          <div class="home-sub">${greet}${me?.username ? ", @" + me.username : ""}</div>
+          <div class="home-sub">${greet}${(me?.username || disk?.username) ? ", @" + (me?.username || disk?.username) : ""}</div>
         </div>
       </div>
 
@@ -213,7 +225,8 @@ export function MenuScreen({ onBanned }) {
       </button>
 
       <div class="home-grid" data-tick=${tick}>
-        ${[...rooms].sort((a, b) => (TILE_ORDER[a.id] ?? 50 + a.sort_order) - (TILE_ORDER[b.id] ?? 50 + b.sort_order)).map((r) => {
+        ${!roomsReady && [1, 2, 3, 4].map((i) => html`<div key=${"s" + i} class="htile skel"></div>`)}
+        ${roomsReady && [...rooms].sort((a, b) => (TILE_ORDER[a.id] ?? 50 + a.sort_order) - (TILE_ORDER[b.id] ?? 50 + b.sort_order)).map((r) => {
           const n = roomUnread[r.id] || 0;
           const unread = r.id !== "eczane" && (api.hasUnread(r, me?.username) || n > 0);
           const col = ROOM_COLORS[r.id] || ["#0EA5E9", "#0369A1"];
