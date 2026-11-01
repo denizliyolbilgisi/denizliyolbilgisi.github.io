@@ -213,7 +213,7 @@ export function MenuScreen({ onBanned }) {
             <button key=${r.id} class=${"htile" + (unread ? " unread" : "")} onClick=${() => navigate("/oda/" + r.id)}>
               ${unread && html`<span class="hbadge">${n >= 99 ? "99+" : n > 0 ? n : ""} yeni</span>`}
               <span class="hic" style=${`background:linear-gradient(135deg,${col[0]},${col[1]})`}>${r.icon}</span>
-              <span class="htt">${r.name.replace(/^DYB[-\s]+/, "")}</span>
+              <span class="htt">${r.name}</span>
               <span class="hts">${tileSub(r)}</span>
             </button>`;
         })}
