@@ -5,6 +5,7 @@ import {
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, useOnResume } from "../ui.js";
 import { disablePush } from "../push.js";
+import { UpdateHelpsModal } from "./helps.js";
 
 const GOLD = "#FFC94D";
 export const PASSWORD_MIN = 8;
@@ -55,6 +56,9 @@ export function ProfileScreen() {
     api.myProfile().then((x) => { setP(x); setErr(null); }).catch((e) => setErr(userMessage(e, "Profil yüklenemedi.")));
   }, [reload]);
   useOnResume(() => setReload((x) => x + 1));   // uygulamaya dönünce yenile
+  // Güncelleme bekleyen davetlilerim (Android)
+  const [helpCount, setHelpCount] = useState(0);
+  useEffect(() => { api.updateHelps().then((l) => setHelpCount(l.length)).catch(() => {}); }, [reload]);
 
   const r = rankOf(p);
   const invited = (p?.invited || []).filter(Boolean);
@@ -98,11 +102,12 @@ export function ProfileScreen() {
           <div class="set-grp">
             ${[
               ["👥", "#7C3AED", "Davetlerim", invited.length ? invited.length + " kişi" : "Davet kodu oluştur", () => navigate("/davetler")],
+              helpCount > 0 && ["🆘", "#EA580C", "Güncelleme Bekleyenler", helpCount + " kişi", () => setModal("helps")],
               ["📝", "#2563EB", "Hakkımda", p.bio ? "" : "Yaz", () => setModal("bio")],
               ["✏️", "#0EA5E9", "Kullanıcı adını değiştir", "", () => setModal("rename")],
               ["🔑", "#0D9488", "Şifremi değiştir", "", () => setModal("password")],
               ["ℹ️", "#D69E2E", "Puan nasıl kazanılır?", "", () => setModal("rules")],
-            ].map(([ic, col, t, v, fn]) => html`
+            ].filter(Boolean).map(([ic, col, t, v, fn]) => html`
               <div class="set-row" key=${t} style="cursor:pointer" onClick=${fn}>
                 <div class="set-ic" style=${`background:${col}`}>${ic}</div>
                 <div class="set-t"><b>${t}</b></div>
@@ -130,6 +135,7 @@ export function ProfileScreen() {
       ${modal === "rename" && html`<${RenameModal} current=${p?.username || ""} nextChange=${p?.username_next_change}
           onClose=${() => setModal(null)}
           onDone=${(n) => { setModal(null); setReload((x) => x + 1); toast("✅ Yeni kullanıcı adın: @" + n, 4000); }} />`}
+      ${modal === "helps" && html`<${UpdateHelpsModal} onClose=${() => setModal(null)} onChanged=${setHelpCount} />`}
       ${modal === "leaders" && html`<${LeaderboardModal} onClose=${() => setModal(null)} />`}
       ${modal === "rules" && html`<${PointRulesModal} onClose=${() => setModal(null)} />`}
       ${modal === "logout" && html`

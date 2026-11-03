@@ -587,3 +587,10 @@ textarea.input { resize: none; }
 /* 1.1.2.0: ilk açılışta yer tutan gri kutular */
 .htile.skel { background: #1E2733; border-color: transparent; box-shadow: none; pointer-events: none; }
 :root[data-theme=light] .htile.skel { background: #E3E8EF; }
+/* 1.1.2.1: fotoğraf sayacı (tam ekran) ve "+6" kutusu */
+.viewer .vcount { text-align: center; color: #fff; font-size: 15px; font-weight: 700; padding: 8px 0 calc(var(--safe-bottom) + 10px); }
+.album .ph .more { color: #fff; font-size: 28px; background: rgba(0,0,0,.62); }
+/* 1.1.2.1: sağa kaydırarak yanıtla */
+.messages { overflow-x: hidden; }
+.mwrap { position: relative; touch-action: pan-y; }
+.mwrap .swipe-ic { position: absolute; left: 4px; top: 50%; margin-top: -14px; font-size: 22px; line-height: 28px; opacity: 0; pointer-events: none; }

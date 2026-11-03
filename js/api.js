@@ -117,9 +117,10 @@ export const cfgInt = (k, d) => {
 // Odalar
 // ---------------------------------------------------------------------------
 export const FALLBACK_ROOMS = [
-  { id: "trafik", name: "DYB-Trafik", icon: "🚦", description: "Yol, trafik, kaza, radar ve hava durumu bilgileri", sort_order: 1 },
-  { id: "is_ilanlari", name: "DYB İş İlanları", icon: "💼", description: "İş arayanlar ve iş verenler için ilanlar", sort_order: 2 },
-  { id: "alim_satim", name: "DYB Alım-Satım", icon: "🛒", description: "Alım, satım, kiralama ve takas ilanları", sort_order: 3 },
+  { id: "trafik", name: "DYB Trafik", icon: "🚦", description: "Radar ve Trafik Paylaşım", sort_order: 1 },
+  { id: "dyt_sohbet", name: "DYT Sohbet", icon: "💬", description: "Sohbet, Yardımlaşma Burda", sort_order: 2 },
+  { id: "is_ilanlari", name: "DYB İş İlanları", icon: "💼", description: "İş Arayan ve İşVeren", sort_order: 3 },
+  { id: "alim_satim", name: "DYB Alım-Satım", icon: "🛒", description: "Al, Sat, Takas Yap Kirala", sort_order: 4 },
 ].map((r) => ({ rules: null, rules_version: 1, read_only: false, admin_ids: [], admin_names: [], my_power: 2, last_photos: 0, ...r }));
 
 let roomsCache = FALLBACK_ROOMS;
@@ -281,7 +282,8 @@ export function previewText(m) {
 // Fotoğraflar (gizli depo: giriş anahtarıyla okunur)
 // ---------------------------------------------------------------------------
 const BUCKET = "chat-photos";
-export const MAX_PHOTOS = 5;
+/** Mesaj başına fotoğraf sınırı: sunucudaki photo_max ayarı (varsayılan 10) */
+export const maxPhotos = () => Math.min(20, Math.max(2, cfgInt("photo_max", 10)));
 const photoUrls = new Map();   // yol -> bellekteki adres
 
 export async function photoUrl(path) {
@@ -295,14 +297,14 @@ export async function photoUrl(path) {
   return url;
 }
 
-/** Fotoğrafı küçültür (uzun kenar 1280), yönünü düzeltir, JPEG'e çevirir (konum bilgisi silinir) */
+/** Fotoğrafı küçültür (uzun kenar 1080), yönünü düzeltir, JPEG'e çevirir (konum bilgisi silinir) */
 export function compressPhoto(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       try {
-        const max = 1280;
+        const max = 1080;   // 1.1.2.1: dosya ~%30 küçük
         const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
         const w = Math.round(img.naturalWidth * scale);
         const h = Math.round(img.naturalHeight * scale);

@@ -4,7 +4,7 @@ import {
   roleRank, roleBadge, toast, copyText, store, dayKey, dayLabel, typingText, charCount, takeChars,
 } from "../lib.js";
 import * as api from "../api.js";
-import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, useInterval, useOnResume } from "../ui.js";
+import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, swipeReply, useInterval, useOnResume } from "../ui.js";
 import { MemberProfileModal } from "./profile.js";
 
 const MAX_LENGTH = 1024;
@@ -244,9 +244,9 @@ export function ChatScreen({ roomId, focusId }) {
   }
 
   function addFiles(files) {
-    const space = api.MAX_PHOTOS - picked.length;
+    const space = api.maxPhotos() - picked.length;
     const add = files.slice(0, space).map((file) => ({ file, url: URL.createObjectURL(file) }));
-    if (files.length > space) toast(`En fazla ${api.MAX_PHOTOS} fotoğraf seçebilirsin`);
+    if (files.length > space) toast(`En fazla ${api.maxPhotos()} fotoğraf seçebilirsin`);
     setPicked([...picked, ...add]);
   }
 
@@ -357,6 +357,8 @@ export function ChatScreen({ roomId, focusId }) {
   const globalMuted = me && me.role !== "kurucu" && isStillActive(me.muted_until);
   const roomMuted = isStillActive(room.muted_until) && rank < 4;
   let bottom;
+  // Yazma kutusu açıkken mesaj sağa kaydırılarak yanıtlanabilir
+  const canSwipeReply = !(globalMuted || roomMuted) && !(room.closed && !canWriteClosed) && !(room.read_only && myPower < 3);
   if (globalMuted || roomMuted) {
     const until = globalMuted ? me.muted_until : room.muted_until;
     const reason = globalMuted ? me.mute_reason : room.mute_reason;
@@ -408,7 +410,7 @@ export function ChatScreen({ roomId, focusId }) {
       ${mentionBox}
       ${charCount(input) >= 700 && html`<div class=${"len-count" + (charCount(input) >= MAX_LENGTH ? " full" : "")}>${charCount(input)} / ${MAX_LENGTH}</div>`}
       <div class="composer">
-        <button class="cam" disabled=${sending || !!editing || picked.length >= api.MAX_PHOTOS} onClick=${() => setPhotoSource(true)}>📷</button>
+        <button class="cam" disabled=${sending || !!editing || picked.length >= api.maxPhotos()} onClick=${() => setPhotoSource(true)}>📷</button>
         <button class="emo" disabled=${sending} onClick=${() => {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
@@ -477,7 +479,9 @@ export function ChatScreen({ roomId, focusId }) {
             const replied = m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : null;
             return html`
               ${newDay && html`<div class="day-chip" key=${"g" + m.id}><span>${dayLabel(m.created_at)}</span></div>`}
-              <div class=${"mwrap" + (mine ? " mine" : "")} id=${"m" + m.id} key=${m.id}>
+              <div class=${"mwrap" + (mine ? " mine" : "")} id=${"m" + m.id} key=${m.id}
+                ...${swipeReply(canSwipeReply, () => { setReplyTo(m); setEditing(null); setTimeout(() => inputRef.current && inputRef.current.focus(), 50); })}>
+                ${canSwipeReply && html`<span class="swipe-ic">↩️</span>`}
                 ${!mine && html`<div class="sender" style=${`cursor:pointer;font-weight:700;${mentionsMe ? "color:var(--yellow)" : ""}`}
                   onClick=${() => setProfileFor(m.user_id)}>${label(m)}${mentionsMe ? "  📣" : ""}</div>`}
                 <div class="bubble" ...${longPress(() => setMenuFor(m))}
@@ -631,7 +635,7 @@ export function ChatScreen({ roomId, focusId }) {
       ${photoSource && html`
         <${Modal} title="Fotoğraf ekle" center=${false} onClose=${() => setPhotoSource(false)}>
           <button class="list-btn" onClick=${() => { setPhotoSource(false); pickPhotos({ camera: true, onPicked: addFiles }); }}>📸  Kamera ile çek</button>
-          <button class="list-btn" onClick=${() => { setPhotoSource(false); pickPhotos({ multiple: true, onPicked: addFiles }); }}>🖼  Galeriden seç (en fazla ${api.MAX_PHOTOS})</button>
+          <button class="list-btn" onClick=${() => { setPhotoSource(false); pickPhotos({ multiple: true, onPicked: addFiles }); }}>🖼  Galeriden seç (en fazla ${api.maxPhotos()})</button>
           <button class="list-btn muted" onClick=${() => setPhotoSource(false)}>Vazgeç</button>
         </${Modal}>`}
 

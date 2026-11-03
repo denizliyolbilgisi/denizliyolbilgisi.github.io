@@ -21,7 +21,6 @@ export function InvitesScreen() {
   const [sendingApk, setSendingApk] = useState(null);
 
   async function load() {
-    api.updateHelps().then(setHelps).catch(() => {});
     try {
       const [list, p] = await Promise.all([api.myInviteCodes(), api.me()]);
       setCodes(list || []);
@@ -121,28 +120,6 @@ export function InvitesScreen() {
           ${busy ? html`<${Spinner} small />` : !me ? (msg?.err ? "🔄 Tekrar dene" : "Yükleniyor…") : nextAllowed ? `Sonraki kod: ${waitText(nextAllowed - Date.now())} sonra` : "＋ Yeni Davet Kodu Oluştur"}
         </button>
         ${msg && html`<div class=${"msg " + (msg.err ? "err" : "ok")}>${msg.text}</div>`}
-        ${helps.length > 0 && html`
-          <div class="card" style="background:var(--amber-box);border-color:var(--amber)">
-            <div class="bold" style="font-size:19px">🆘 Güncellemesi gerekenler (Android)</div>
-            <div class="small" style="color:var(--amber-text-soft);margin-bottom:6px">"Gönder" ile yeni Android sürümünü WhatsApp'tan gönderebilirsin. Dosyayı açıp "Güncelle"ye basması yeterli.</div>
-            ${helps.slice(0, 6).map((h) => html`
-              <div class="row" key=${h.user_id} style="margin-top:8px">
-                <div class="grow">
-                  <div class="bold" style="font-size:18px">@${h.username || ""}</div>
-                  <div class="small" style="color:var(--amber-text-soft)">${h.app_version_name ? "Sürüm " + h.app_version_name : "Eski sürüm"}${h.request_id ? " • yardım istedi" : ""}</div>
-                </div>
-                <button class="btn small" disabled=${!!sendingApk} onClick=${() => sendApp(h)}>${sendingApk === h.user_id ? "İndiriliyor…" : "📤 Gönder"}</button>
-                ${h.request_id && html`<button class="btn small ghost" disabled=${!!sendingApk} onClick=${async () => {
-                  try {
-                    await api.resolveUpdateHelp(h.user_id);
-                    toast("@" + (h.username || "") + " işaretlendi");
-                    load();
-                  } catch (e) {
-                    setMsg({ err: true, text: userMessage(e) });
-                  }
-                }}>✓</button>`}
-              </div>`)}
-          </div>`}
         ${codes === null ? html`<${Spinner} />` : codes.length === 0
           ? html`<div class="center muted" style="padding:30px">Henüz davet kodun yok.<br />Yukarıdaki butonla ilk kodunu oluştur.</div>`
           : codes.map((c) => html`
