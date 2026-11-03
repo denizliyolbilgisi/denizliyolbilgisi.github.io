@@ -7,6 +7,8 @@ import { DENIZLI, FETCH_RADIUS_M, ALERT_DISTANCE_M } from "../config.js";
 const REFETCH_AFTER_MOVE_M = 5000;
 const FADE_LAST_MIN = 5;
 
+const PIN_MAX_M = 1000;   // 📍 iğne en fazla 1 km uzağa
+
 function distance(a, b) {
   const R = 6371000;
   const toRad = (d) => (d * Math.PI) / 180;
@@ -78,6 +80,12 @@ export function MapScreen({ focusRadarId, openReport }) {
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
   const [focusId, setFocusId] = useState(null);
+  // 1.1.2.2 📍 iğneyle bildirim
+  const [pinPick, setPinPick] = useState(false);     // ortadaki iğneyle yer seçiliyor
+  const [pinPoint, setPinPoint] = useState(null);    // seçilen nokta (null: bulunduğum yer)
+  const [center, setCenter] = useState(null);
+  const pinLayer = useRef(null);
+  const startPinRef = useRef(null);
 
   // Harita kurulumu
   useEffect(() => {
@@ -89,7 +97,33 @@ export function MapScreen({ focusRadarId, openReport }) {
       attribution: "© OpenStreetMap",
     }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
+    pinLayer.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+    // 📍 Haritaya basılı tut: oraya iğne düşer (iPhone'da kendi zamanlayıcımız)
+    let hold = null, sx = 0, sy = 0, fired = false;
+    const el = mapEl.current;
+    const clear = () => { if (hold) { clearTimeout(hold); hold = null; } };
+    el.addEventListener("touchstart", (e) => {
+      clear();
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; fired = false;
+      hold = setTimeout(() => {
+        hold = null; fired = true;
+        const rect = el.getBoundingClientRect();
+        const ll = map.containerPointToLatLng([sx - rect.left, sy - rect.top]);
+        if (navigator.vibrate) navigator.vibrate(20);
+        startPinRef.current && startPinRef.current({ lat: ll.lat, lng: ll.lng });
+      }, 600);
+    }, { passive: true });
+    el.addEventListener("touchmove", (e) => {
+      const t = e.touches[0];
+      if (!t || Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) clear();
+    }, { passive: true });
+    el.addEventListener("touchend", clear, { passive: true });
+    el.addEventListener("touchcancel", clear, { passive: true });
+    map.on("contextmenu", (e) => { if (!fired) startPinRef.current && startPinRef.current({ lat: e.latlng.lat, lng: e.latlng.lng }); fired = false; });
+    map.on("move", () => { const c = map.getCenter(); setCenter({ lat: c.lat, lng: c.lng }); });
     document.addEventListener("touchstart", unlockAudio, { once: true });
     setTimeout(() => map.invalidateSize(), 200);
     return () => map.remove();
@@ -219,8 +253,48 @@ export function MapScreen({ focusRadarId, openReport }) {
     return () => clearTimeout(t);
   }, [msg]);
 
-  async function report(type) {
+  // 📍 İğne bulunduğum yerden en fazla 1 km uzağa bırakılabilir (sunucu da denetler)
+  function startPin(p) {
+    if (!loc) {
+      setMsg(locError || "📍 İğneyle bildirim için konumunun açık olması gerekiyor.");
+      return;
+    }
+    if (distance(loc, p) > PIN_MAX_M) {
+      setMsg("📍 İğne bulunduğun yerden en fazla 1 km uzağa bırakılabilir");
+      return;
+    }
+    setPinPick(false);
+    setPinPoint(p);
+    setShowReport(true);
+  }
+  startPinRef.current = (p) => { if (!pinPick) startPin(p); };
+
+  // 1 km dairesi ve seçilen noktadaki iğne
+  useEffect(() => {
+    const L = window.L;
+    const layer = pinLayer.current;
+    if (!layer) return;
+    layer.clearLayers();
+    if ((pinPick || pinPoint) && loc) {
+      L.circle([loc.lat, loc.lng], { radius: PIN_MAX_M, color: "#1F6FEB", weight: 2, fillColor: "#1F6FEB", fillOpacity: 0.08, interactive: false }).addTo(layer);
+    }
+    if (pinPoint) {
+      L.marker([pinPoint.lat, pinPoint.lng], {
+        icon: L.divIcon({ className: "", html: '<div class="pin-drop">📍</div>', iconSize: [40, 40], iconAnchor: [20, 38] }),
+        interactive: false,
+      }).addTo(layer);
+    }
+  }, [pinPick, pinPoint, loc]);
+
+  function closeReport() {
     setShowReport(false);
+    setPinPoint(null);
+  }
+
+  async function report(type) {
+    const pin = pinPoint;
+    setShowReport(false);
+    setPinPoint(null);
     unlockAudio();
     if (!loc) {
       setMsg(locError || "Konumun bulunamadı. Biraz bekleyip tekrar dene.");
@@ -228,12 +302,14 @@ export function MapScreen({ focusRadarId, openReport }) {
     }
     setBusy(true);
     try {
-      const place = await api.placeName(loc.lat, loc.lng);
-      await api.reportRadar(type.key, loc.lat, loc.lng, place);
-      setMsg(`${type.emoji} ${type.label} bildirildi, teşekkürler!`);
+      const at = pin || loc;
+      const place = await api.placeName(at.lat, at.lng);
+      if (pin) await api.reportRadarPin(type.key, pin, loc, place);
+      else await api.reportRadar(type.key, loc.lat, loc.lng, place);
+      setMsg(`${type.emoji} ${type.label} bildirildi${pin ? " 📍" : ""}, teşekkürler!`);
       await load(loc);
     } catch (e) {
-      setMsg("Bildirilemedi: " + userMessage(e));
+      setMsg(userMessage(e, "Bildirilemedi. Biraz sonra tekrar dene."));
     } finally {
       setBusy(false);
     }
@@ -278,7 +354,7 @@ export function MapScreen({ focusRadarId, openReport }) {
         ${alert && html`<div class="alert">⚠ ${Math.round(alert[1])} m ileride ${api.radarType(alert[0].type).emoji} ${api.radarType(alert[0].type).label}</div>`}
         ${locError && html`<div class="map-msg">${locError}</div>`}
         ${msg && html`<div class="map-msg">${msg}</div>`}
-        <div class="fab-row">
+        ${!pinPick && html`<div class="fab-row">
           <button class="fab" title="Konumum" onClick=${() => {
             unlockAudio();
             if (loc) mapRef.current.setView([loc.lat, loc.lng], 16);
@@ -287,18 +363,35 @@ export function MapScreen({ focusRadarId, openReport }) {
           <button class="report-btn" disabled=${busy} onClick=${() => { unlockAudio(); setShowReport(true); }}>
             ${busy ? html`<${Spinner} small />` : "➕ Durum Bildir"}
           </button>
-        </div>
+        </div>`}
+        ${pinPick && (() => {
+          const d = loc && center ? distance(loc, center) : null;
+          const far = d !== null && d > PIN_MAX_M;
+          return html`
+            <div class="pin-bar">
+              <div class=${"pin-dist" + (far ? " far" : "")}>${d === null ? "Konumun bulunuyor…" : far
+                ? `⚠️ Çok uzak: ${(d / 1000).toFixed(1).replace(".", ",")} km (en fazla 1 km)` : `📍 Bulunduğun yere ${Math.round(d)} m`}</div>
+              <div class="row" style="gap:10px">
+                <button class="btn ghost grow" onClick=${() => setPinPick(false)}>Vazgeç</button>
+                <button class="btn green" style="flex:2" disabled=${d === null || far} onClick=${() => center && startPin(center)}>Bu konumu bildir</button>
+              </div>
+            </div>`;
+        })()}
       </div>
 
+      ${pinPick && html`
+        <div class="pin-center" aria-hidden="true">📍</div>
+        <div class="pin-hint">Haritayı kaydırıp iğneyi bildirmek istediğin yere getir (mavi daire içinde, en fazla 1 km).</div>`}
+
       ${showReport && html`
-        <div class="rsheet-back" onClick=${() => setShowReport(false)}>
+        <div class="rsheet-back" onClick=${closeReport}>
           <div class="rsheet" onClick=${(e) => e.stopPropagation()}>
             <div class="rsheet-handle"></div>
             <div class="row" style="align-items:center">
               <h2 class="grow" style="margin:0">Durum bildir</h2>
-              <button class="btn ghost" style="font-size:22px" onClick=${() => setShowReport(false)}>✕</button>
+              <button class="btn ghost" style="font-size:22px" onClick=${closeReport}>✕</button>
             </div>
-            <div class="muted" style="margin-bottom:10px">Bulunduğun yere eklenir. Ne gördün?</div>
+            <div class="muted" style="margin-bottom:10px">${pinPoint ? "📍 Seçtiğin noktaya eklenir. Ne gördün?" : "Bulunduğun yere eklenir. Ne gördün?"}</div>
             <div class="report-grid">
               ${api.RADAR_TYPES.map((t) => html`
                 <button key=${t.key} class="report-tile" onClick=${() => report(t)}>
@@ -307,6 +400,14 @@ export function MapScreen({ focusRadarId, openReport }) {
                   <small>Haritada ${api.durationText(t.minutes)}</small>
                 </button>`)}
             </div>
+            ${!pinPoint && html`
+              <button class="btn outline block" style="margin-top:12px" onClick=${() => {
+                setShowReport(false);
+                const c = mapRef.current.getCenter();
+                setCenter({ lat: c.lat, lng: c.lng });
+                setPinPick(true);
+              }}>📍 Haritada yer seç (en fazla 1 km)</button>
+              <div class="muted small" style="margin-top:6px">İpucu: Haritada bir yere basılı tutarak da iğne bırakabilirsin. Saatte 3 iğneli bildirim hakkın var.</div>`}
           </div>
         </div>`}
 
@@ -323,6 +424,7 @@ export function MapScreen({ focusRadarId, openReport }) {
               <h3 style="margin:0">${t.label}</h3>
             </div>
             ${selected.place && html`<div class="info-row"><span class="l">🗺 Yer</span><span>${selected.place}</span></div>`}
+            ${selected.via_pin && html`<div class="info-row"><span class="l">📍 Nasıl</span><span>İğneyle bildirildi</span></div>`}
             <div class="info-row"><span class="l">📍 Bildirildi</span><span>${clock(selected.created_at)} (${agoText(selected.created_at)})</span></div>
             <div class="info-row"><span class="l">✅ Son onay</span><span>${clock(selected.last_confirmed_at)} (${agoText(selected.last_confirmed_at)})</span></div>
             <div class="info-row"><span class="l">👥 Onaylayan</span><span>${selected.confirm_count} kişi</span></div>

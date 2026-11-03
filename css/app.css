@@ -594,3 +594,11 @@ textarea.input { resize: none; }
 .messages { overflow-x: hidden; }
 .mwrap { position: relative; touch-action: pan-y; }
 .mwrap .swipe-ic { position: absolute; left: 4px; top: 50%; margin-top: -14px; font-size: 22px; line-height: 28px; opacity: 0; pointer-events: none; }
+/* 1.1.2.2: 📍 iğneyle bildirim */
+.pin-center { position: absolute; left: 50%; top: 50%; z-index: 600; font-size: 44px; line-height: 1; transform: translate(-50%, -100%); pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
+.pin-hint { position: absolute; left: 16px; right: 16px; top: calc(var(--safe-top) + 70px); z-index: 600; background: var(--card); color: var(--text, #fff);
+  border-radius: 14px; padding: 12px; font-size: 15px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.pin-bar { background: var(--card); color: var(--text, #fff); border-radius: 18px; padding: 14px; box-shadow: 0 -4px 16px rgba(0,0,0,.25); }
+.pin-dist { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
+.pin-dist.far { color: #EF4444; }
+.pin-drop { font-size: 36px; line-height: 1; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }

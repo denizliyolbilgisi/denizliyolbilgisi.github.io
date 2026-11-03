@@ -73,6 +73,7 @@ export const store = {
 // Hata mesajları (teknik ayrıntı asla gösterilmez)
 // ---------------------------------------------------------------------------
 const SAFE_PREFIXES = [
+  "📍",   // 1.1.2.2: iğneyle bildirim (1 km, saatte 3 hak)
   "Bu kullanıcı özel", "Bu kullanıcıya özel", "Özel mesajların kapalı", "Bu kişiyi engelledin", "Bu üyeye mesaj",
   "Kendine mesaj", "Kendini engelleyemezsin", "Kurucu ve yöneticiler", "Konuşma bulunamadı", "Bugün çok fazla",
   "Sadece kendi mesajını", "Geçersiz bildirim", "Bildirim bulunamadı",

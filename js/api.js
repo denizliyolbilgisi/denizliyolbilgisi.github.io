@@ -427,8 +427,18 @@ export function durationText(min) {
   return `${min} dk`;
 }
 
-export const nearbyRadars = (lat, lng, radius) =>
-  rpc("nearby_radars", { p_lat: lat, p_lng: lng, p_radius_m: radius });
+/** 1.1.2.2: iğne rozetiyle (nearby_radars_v2); sunucuda yoksa eskisi */
+export async function nearbyRadars(lat, lng, radius) {
+  const args = { p_lat: lat, p_lng: lng, p_radius_m: radius };
+  try {
+    return await rpc("nearby_radars_v2", args);
+  } catch (_) {
+    return rpc("nearby_radars", args);
+  }
+}
+/** 📍 İğneyle bildir: pin = iğne, me = cihazın konumu (sunucu 1 km ve saatte 3 hakkı denetler) */
+export const reportRadarPin = (type, pin, me, place) =>
+  rpc("report_radar_pin", { p_type: type, p_lat: pin.lat, p_lng: pin.lng, p_my_lat: me.lat, p_my_lng: me.lng, p_place: place || null });
 export const reportRadar = (type, lat, lng, place) =>
   rpc("report_radar", { p_type: type, p_lat: lat, p_lng: lng, p_place: place || null });
 export const voteRadar = (id, stillThere) => rpc("vote_radar", { p_radar_id: id, p_still_there: stillThere });
