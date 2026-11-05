@@ -636,3 +636,9 @@ export async function voiceUrl(path) {
 
 // 🎨 Duvar kâğıtları: sunucudaki varsayılan + sonradan eklenenler
 export const wallpapers = () => rpc("wallpapers");
+
+// 📨 Davet Et: hazır davet mesajı sunucuda ({KOD} yerine kod gelir)
+export const myInviteShare = () => rpc("my_invite_share");
+export async function inviteShareText(code) {
+  try { return await rpc("invite_share_text", { p_code: code }); } catch (_) { return null; }
+}

@@ -4,6 +4,7 @@ import {
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, useOnResume } from "../ui.js";
+import { shareInvite } from "./invites.js";
 import { disablePush } from "../push.js";
 import { UpdateHelpsModal } from "./helps.js";
 
@@ -101,6 +102,7 @@ export function ProfileScreen() {
           <div class="set-sec">HESAP</div>
           <div class="set-grp">
             ${[
+              ["📨", "#16A34A", "Davet Et", "", () => shareInvite()],
               ["👥", "#7C3AED", "Davetlerim", invited.length ? invited.length + " kişi" : "Davet kodu oluştur", () => navigate("/davetler")],
               helpCount > 0 && ["🆘", "#EA580C", "Güncelleme Bekleyenler", helpCount + " kişi", () => setModal("helps")],
               ["📝", "#2563EB", "Hakkımda", p.bio ? "" : "Yaz", () => setModal("bio")],

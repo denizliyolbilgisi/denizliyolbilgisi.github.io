@@ -93,7 +93,7 @@ export function InvitesScreen() {
   }
 
   async function share(code) {
-    const text = "DYB - Denizli Yol Bilgisi'ne davetlisin!\n\n" +
+    const text = (await api.inviteShareText(code)) || "DYB - Denizli Yol Bilgisi'ne davetlisin!\n\n" +
       `Davet kodun: ${code}\n\n` +
       "📱 Android: Uygulamada \"Davet kodum var\" ekranına bu kodu gir.\n" +
       `🍏 iPhone: Safari'de ${SITE} adresini aç, "Kayıt ol"a dokun ve bu kodu gir.`;
@@ -157,4 +157,25 @@ export function InvitesScreen() {
           <p style="margin:0">${toDelete} kodu silinsin mi? Bu kodu verdiğin kişi artık kayıt olamaz.</p>
         </${Modal}>`}
     </div>`;
+}
+
+/** 📨 Davet Et (Profil): kullanılmamış kod ya da yeni kod + hazır mesaj → paylaş */
+export async function shareInvite() {
+  let r;
+  try {
+    r = await api.myInviteShare();
+  } catch (e) {
+    toast(userMessage(e, "Davet kodu oluşturulamadı."), 4000);
+    return;
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: r.text });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;   // vazgeçti
+      // iPhone bazen beklemeden sonra paylaşmaya izin vermez: metni kopyala
+    }
+  }
+  toast((await copyText(r.text)) ? `📋 Davet mesajı kopyalandı (${r.code}). WhatsApp'a yapıştırabilirsin.` : "Kopyalanamadı", 4500);
 }
