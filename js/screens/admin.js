@@ -6,6 +6,7 @@ import {
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, Switch } from "../ui.js";
 import { MemberSheet, SimpleMemberRow } from "./staff.js";
+import { ReportVoice } from "./voice.js";
 
 const MUTE_OPTIONS = [["1 saat", 60], ["5 saat", 300], ["12 saat", 720], ["24 saat", 1440],
   ["15 gün", 15 * 1440], ["30 gün", 30 * 1440], ["Süresiz", null]];
@@ -374,6 +375,7 @@ function ReportsTab({ myRank, reload, onInfo, onChanged, onMute }) {
             <div class="soft small">Şikayet eden: ${r.reporter_name ? "@" + r.reporter_name : "-"} • ${agoText(r.created_at)}</div>
             ${r.room_name && html`<div class="soft small">Oda: ${r.room_name}</div>`}
             <div class="quote-box" style="margin-top:8px">"${r.message_text || ""}"</div>
+            ${(r.message_text || "").includes("🎤 Sesli mesaj") && html`<${ReportVoice} reportId=${r.id} />`}
             ${!r.message_exists && html`<div class="muted small">(Mesaj sohbetten silinmiş)</div>`}
             ${r.note && html`<div class="soft small" style="margin-top:6px">Açıklama: ${r.note}</div>`}
             ${open ? html`

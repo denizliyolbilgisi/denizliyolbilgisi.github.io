@@ -6,6 +6,8 @@ import {
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, swipeReply, useInterval, useOnResume } from "../ui.js";
 import { WhoisModal, MessageMenu } from "./staff.js";
+import { useVoiceInput, MicButton, RecordingIndicator, VoiceBubble } from "./voice.js";
+import { WallLayer } from "../wall.js";
 
 const MAX_LENGTH = 1024;
 
@@ -250,6 +252,28 @@ export function ChatScreen({ roomId, focusId }) {
     setPicked([...picked, ...add]);
   }
 
+  // 🎤 Bas-konuş (1.1.2.4): kayıt bitince yükle ve gönder
+  const voice = useVoiceInput(async (blob, sec) => {
+    const replyId = replyTo?.id;
+    setSending(true);
+    setProgress("🎤 Ses gönderiliyor…");
+    let path = null;
+    try {
+      path = await api.uploadVoice(blob);
+      await api.sendVoiceToRoom(roomId, path, sec, replyId);
+      path = null;
+      setReplyTo(null);
+      setError(null);
+      await loadMessages();
+    } catch (e) {
+      if (path) api.deleteVoice(path);
+      setError("❗ Ses gönderilemedi: " + userMessage(e));
+    } finally {
+      setSending(false);
+      setProgress(null);
+    }
+  });
+
   async function send() {
     const text = input.trim();
     const editPhotos = editing?.photos?.length || 0;
@@ -415,6 +439,7 @@ export function ChatScreen({ roomId, focusId }) {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
         }}>${showEmoji ? "⌨️" : "😊"}</button>
+        ${voice.recording ? html`<${RecordingIndicator} voice=${voice} />` : html`
         <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" value=${input} ref=${inputRef}
           onFocus=${() => setShowEmoji(false)}
           onSelect=${(e) => { caretRef.current = [e.target.selectionStart, e.target.selectionEnd]; }}
@@ -433,16 +458,20 @@ export function ChatScreen({ roomId, focusId }) {
             caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-          }}></textarea>
-        <button class="btn" disabled=${sending || (!input.trim() && !picked.length && !(editing?.photos?.length))} onClick=${send}>
+          }}></textarea>`}
+        ${voice.enabled && !editing && !picked.length && !input.trim() && (!sending || voice.recording)
+          ? html`<${MicButton} voice=${voice} disabled=${sending} />`
+          : html`<button class="btn" disabled=${sending || (!input.trim() && !picked.length && !(editing?.photos?.length))} onClick=${send}>
           ${sending ? html`<${Spinner} small />` : editing ? "Kaydet" : "Gönder"}
-        </button>
+        </button>`}
       </div>
+      ${voice.notice}
       ${showEmoji && html`<${EmojiPanel} onPick=${insertEmoji} />`}`;
   }
 
   return html`
-    <div class="chat">
+    <div class="chat has-wall">
+      <${WallLayer} />
       <${TopBar} title=${`${room.icon} ${room.name}`} onBack=${() => navigate("/menu")}
         sub=${(room.closed ? "🔒 Kapalı" + (room.closed_by_name ? " • @" + room.closed_by_name + " kapattı" : "") : null)
           || typingText(typers)
@@ -496,7 +525,8 @@ export function ChatScreen({ roomId, focusId }) {
                       </div>
                     </div>`}
                   <${PhotoAlbum} photos=${m.photos} expired=${m.photos_expired} onOpen=${(i) => setViewer({ msg: m, index: i })} />
-                  ${m.content && m.content.trim() && html`<${ClampText} text=${m.content} color=${mine ? "#FFE082" : mentionsMe ? "var(--mention-link)" : "var(--link)"} />`}
+                  ${m.voice || m.voice_expired ? html`<${VoiceBubble} path=${m.voice} sec=${m.voice_sec} expired=${m.voice_expired} />`
+                    : m.content && m.content.trim() && html`<${ClampText} text=${m.content} color=${mine ? "#FFE082" : mentionsMe ? "var(--mention-link)" : "var(--link)"} />`}
                   <div class="time">${m.id === room.pinned_message_id ? "📌 " : ""}${m.edited_at ? "düzenlendi • " : ""}${chatTime(m.created_at)}${mine ? "  ✓" : ""}</div>
                 </div>
                 ${api.reactionCounts(m).length > 0 && html`
@@ -528,7 +558,7 @@ export function ChatScreen({ roomId, focusId }) {
         // 1.1.2.3: sade menü (gruplar: 0 temel, 1 dikkat, 2 silme)
         const actions = [
           { title: "Yanıtla", icon: "↩️", group: 0, onClick: () => { setReplyTo(m); setEditing(null); close(); } },
-          m.content && m.content.trim() && { title: "Kopyala", icon: "📋", group: 0, onClick: async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); } },
+          m.content && m.content.trim() && !m.voice && { title: "Kopyala", icon: "📋", group: 0, onClick: async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); } },
           api.editable(m, myId) && !(room.read_only && !canModerate) && { title: "Düzenle", icon: "✏️", group: 0,
             onClick: () => { setEditing(m); setReplyTo(null); setPicked([]); setInput(m.content || ""); caretRef.current = null; close(); } },
           m.photos && m.photos.length > 0 && !m.photos_expired && { title: "Fotoğrafları aç", icon: "🖼", group: 0, onClick: () => { setViewer({ msg: m, index: 0 }); close(); } },

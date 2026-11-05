@@ -4,6 +4,7 @@ import * as api from "../api.js";
 import { themePref, setThemePref, textLevel, setTextLevel, TEXT_NAMES } from "../theme.js";
 import { TopBar, Modal, Spinner, Switch, useInterval } from "../ui.js";
 import { APP_VERSION } from "../config.js";
+import { currentId as wallId, findItem as wallItem, PHOTO as WALL_PHOTO, NONE as WALL_NONE } from "../wall.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
 
 const SILENCE = [
@@ -141,6 +142,11 @@ export function SettingsScreen() {
            ["light", "☀️", "#F59E0B", "Açık", null]].map(([v, ic, col, t, sub]) => html`
           <${Row} key=${v} icon=${ic} color=${col} title=${t} sub=${sub}
             value=${theme === v ? "✓" : ""} valueClass="g" onClick=${() => pickTheme(v)} />`)}
+      </div>
+      <div class="set-grp" style="margin-top:10px">
+        <${Row} icon="🎨" color="#7C3AED" title="Duvar kâğıdı"
+          sub=${(() => { const id = wallId(); return id === WALL_PHOTO ? "Kendi fotoğrafın" : id === WALL_NONE ? "Düz" : (wallItem(id)?.name || "DYB Logosu"); })()}
+          onClick=${() => navigate("/duvar")} />
       </div>
       <div class="set-grp" style="margin-top:10px">
         <div class="set-row" style="border-bottom:0;min-height:0;padding-bottom:0">

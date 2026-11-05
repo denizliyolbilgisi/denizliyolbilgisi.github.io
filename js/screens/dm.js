@@ -4,6 +4,8 @@ import * as api from "../api.js";
 import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume, useLive } from "../ui.js";
 import { WhoisModal, MessageMenu } from "./staff.js";
 import { EmojiPanel, ReportDialog } from "./chat.js";
+import { useVoiceInput, MicButton, RecordingIndicator, VoiceBubble } from "./voice.js";
+import { WallLayer } from "../wall.js";
 
 const MAX_LENGTH = 1024;
 const AVATAR_COLORS = ["#E57373", "#64B5F6", "#81C784", "#FFB74D", "#BA68C8", "#4DB6AC", "#F06292", "#7986CB"];
@@ -233,6 +235,27 @@ export function DmChatScreen({ userId }) {
     caretRef.current = [start + emoji.length, start + emoji.length];
   }
 
+  // 🎤 Bas-konuş (1.1.2.4)
+  const voice = useVoiceInput(async (blob, sec) => {
+    setSending(true);
+    let path = null;
+    try {
+      path = await api.uploadVoice(blob);
+      const r = await api.sendVoiceDm(userId, path, sec);
+      path = null;
+      setErr(null);
+      if (r && r.conversation_id && r.conversation_id !== convId) setConvId(r.conversation_id);
+      await loadMessages(r?.conversation_id || convId);
+      scrollDown();
+    } catch (e) {
+      if (path) api.deleteVoice(path);
+      setErr("❗ Ses gönderilemedi: " + userMessage(e));
+      loadStatus();
+    } finally {
+      setSending(false);
+    }
+  });
+
   async function send() {
     const text = input.trim();
     if (!text || sending) return;
@@ -305,6 +328,7 @@ export function DmChatScreen({ userId }) {
           if (showEmoji) { setShowEmoji(false); inputRef.current && inputRef.current.focus(); }
           else { inputRef.current && inputRef.current.blur(); setShowEmoji(true); }
         }}>${showEmoji ? "⌨️" : "😊"}</button>
+        ${voice.recording ? html`<${RecordingIndicator} voice=${voice} />` : html`
         <textarea class="input" rows="1" autocapitalize="sentences" autocorrect="on" spellcheck="true" value=${input} ref=${inputRef}
           placeholder=${editing ? "Mesajını düzelt..." : "Mesaj yaz..."}
           onFocus=${() => setShowEmoji(false)}
@@ -323,16 +347,20 @@ export function DmChatScreen({ userId }) {
             caretRef.current = [e.target.selectionStart, e.target.selectionEnd];
             e.target.style.height = "auto";
             e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-          }}></textarea>
-        <button class="btn" disabled=${sending || !input.trim()} onClick=${send}>
+          }}></textarea>`}
+        ${voice.enabled && !editing && !input.trim() && (!sending || voice.recording)
+          ? html`<${MicButton} voice=${voice} disabled=${sending} />`
+          : html`<button class="btn" disabled=${sending || !input.trim()} onClick=${send}>
           ${sending ? html`<${Spinner} small />` : editing ? "Kaydet" : "Gönder"}
-        </button>
+        </button>`}
       </div>
+      ${voice.notice}
       ${showEmoji && html`<${EmojiPanel} onPick=${insertEmoji} />`}`;
   }
 
   return html`
-    <div class="chat">
+    <div class="chat has-wall">
+      <${WallLayer} />
       <${TopBar} title=${"✉️ " + name} backLabel="←" onBack=${() => navigate("/mesajlar")}
         sub=${s ? ((typers.length ? "✍️ yazıyor…" : presenceText(s.online, s.last_seen))
           || (s.is_staff ? "Yönetim • Profil için dokun" : "Profil ve engelleme için dokun")) : ""}
@@ -353,7 +381,9 @@ export function DmChatScreen({ userId }) {
               ${newDay && html`<div class="day-chip" key=${"g" + m.id}><span>${dayLabel(m.created_at)}</span></div>`}
               <div class=${"mwrap" + (mine ? " mine" : "")} id=${"d" + m.id} key=${m.id}>
                 <div class="bubble" ...${longPress(() => { if (!(m.deleted && mine)) setMenuFor(m); })}>
-                  <div class=${"txt" + (big && !m.deleted ? " big" : "") + (m.deleted ? " deleted" : "")}>${m.content}</div>
+                  ${!m.deleted && (m.voice || m.voice_expired)
+                    ? html`<${VoiceBubble} path=${m.voice} sec=${m.voice_sec} expired=${m.voice_expired} />`
+                    : html`<div class=${"txt" + (big && !m.deleted ? " big" : "") + (m.deleted ? " deleted" : "")}>${m.content}</div>`}
                   <div class="time">${m.edited_at && !m.deleted ? "düzenlendi • " : ""}${chatTime(m.created_at)}
                     ${mine && !m.deleted && html` <${Ticks} status=${m.status} />`}</div>
                 </div>
@@ -384,9 +414,9 @@ export function DmChatScreen({ userId }) {
         const close = () => setMenuFor(null);
         // 1.1.2.3: odalardaki gibi sade menü
         const actions = [
-          !m.deleted && mine && api.editable({ user_id: m.sender_id, created_at: m.created_at }, myId) && !(s && s.reason) &&
+          !m.deleted && mine && !m.voice && api.editable({ user_id: m.sender_id, created_at: m.created_at }, myId) && !(s && s.reason) &&
             { title: "Düzenle", icon: "✏️", group: 0, onClick: () => { setEditing(m); setInput(m.content); caretRef.current = null; close(); } },
-          !m.deleted && { title: "Kopyala", icon: "📋", group: 0, onClick: async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); } },
+          !m.deleted && !m.voice && { title: "Kopyala", icon: "📋", group: 0, onClick: async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); } },
           !mine && { title: "Şikayet et", icon: "🚩", color: "var(--amber)", group: 1, onClick: () => { setReportFor(m); close(); } },
           mine && !m.deleted && { title: "Sil", icon: "🗑", color: "var(--red-soft)", group: 2, onClick: () => { setDeleteFor(m); close(); } },
         ].filter(Boolean);

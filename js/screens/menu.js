@@ -5,6 +5,8 @@ import { Modal, useInterval, useOnResume, useLive } from "../ui.js";
 import { DENIZLI, FETCH_RADIUS_M } from "../config.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
 import { RankUpModal } from "./profile.js";
+import { WallLayer, useWall, NONE, refresh as refreshWall } from "../wall.js";
+import { refreshVoiceSettings } from "./voice.js";
 
 const ROOM_COLORS = {
   trafik: ["#FFB020", "#E07B00"],
@@ -42,6 +44,7 @@ function Tile({ icon, label, color, count, onClick }) {
 }
 
 export function MenuScreen({ onBanned }) {
+  const wall = useWall();   // 🎨 1.1.2.4
   // Son görülen ana ekran telefonda saklı: açılışta her şey tek seferde gelir
   const cacheKey = "dyb_menu_" + (api.myId() || "");
   const [disk] = useState(() => store.get(cacheKey, null));
@@ -84,6 +87,9 @@ export function MenuScreen({ onBanned }) {
         store.set(roleKey, rk);
       }
       if (p && p.banned_at && p.role !== "kurucu") onBanned(p);
+      // 1.1.2.4: varsayılan duvar kâğıdı + sesli mesaj ayarları sunucudan
+      refreshWall();
+      refreshVoiceSettings();
       // 1.1.2.3: rütbe ve izinler sunucudan
       api.refreshPerms().then(() => {
         setCanAdmin(can("yonetim_paneli"));
@@ -194,7 +200,8 @@ export function MenuScreen({ onBanned }) {
   };
 
   return html`
-    <div class="screen gradient">
+    <div class=${"screen gradient" + (wall.id !== NONE ? " has-wall" : "")}>
+      <${WallLayer} />
       <div class="home-head">
         <div class="badge home-logo">DYB</div>
         <div class="grow" style="min-width:0">

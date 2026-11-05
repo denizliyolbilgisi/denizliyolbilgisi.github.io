@@ -186,7 +186,7 @@ export function hasUnread(room, myName) {
 // ---------------------------------------------------------------------------
 // Mesajlar
 // ---------------------------------------------------------------------------
-const MSG_COLUMNS = "id, content, created_at, user_id, reply_to_id, photos, photos_expired, room_id, mention_all, edited_at, " +
+const MSG_COLUMNS = "id, content, created_at, user_id, reply_to_id, photos, photos_expired, room_id, mention_all, edited_at, voice, voice_sec, voice_expired, " +
   "profiles(username, role), message_reactions(emoji, user_id)";
 
 export async function latestMessages(roomId, count = 100) {
@@ -208,7 +208,7 @@ export const EDIT_MINUTES = 15;
 
 /** Kendi mesajı ve ilk 15 dakika içinde mi? */
 export function editable(m, uid) {
-  if (!uid || m.user_id !== uid) return false;
+  if (!uid || m.user_id !== uid || m.voice) return false;
   const t = new Date(m.created_at).getTime();
   return !isNaN(t) && Date.now() - t < EDIT_MINUTES * 60000;
 }
@@ -273,6 +273,7 @@ export async function mentionCandidates() {
 }
 
 export function previewText(m) {
+  if (m.voice) return "🎤 Sesli mesaj" + (m.voice_sec ? ` (${m.voice_sec} sn)` : "");
   const n = m.photos ? m.photos.length : 0;
   const photo = n > 1 ? `📷 ${n} fotoğraf` : n === 1 ? "📷 Fotoğraf" : null;
   const text = (m.content || "").trim() || null;
@@ -516,7 +517,7 @@ export const usagePing = (seconds) => rpc("usage_ping", { p_seconds: seconds });
 export const myConversations = () => rpc("my_conversations");
 export const dmUnreadTotal = () => rpc("dm_unread_total");
 export const dmStatus = (userId) => rpc("dm_status", { p_user: userId });
-export const dmMessages = (convId) => rpc("dm_messages", { p_conv: convId, p_limit: 200 });
+export const dmMessages = (convId) => rpc("dm_messages_v2", { p_conv: convId, p_limit: 200 });
 export const markDmRead = (convId) => rpc("mark_dm_read", { p_conv: convId });
 export const sendDm = (to, text) => rpc("send_dm", { p_to: to, p_content: text });
 export const editDm = (id, text) => rpc("edit_dm", { p_id: id, p_content: text });
@@ -582,3 +583,56 @@ export async function refreshPerms() {
 export const memberList = async () => (await rpc("member_list")) || [];
 /** Kişi kartı (/whois); room verilirse o odada verilebilecek görevler de gelir */
 export const whois = (userId, room) => rpc("whois", room ? { p_user: userId, p_room: room } : { p_user: userId });
+
+// ---------------------------------------------------------------------------
+// 1.1.2.4: 🎤 Sesli mesaj (gizli depo; 3 gün sonra sunucu siler)
+// ---------------------------------------------------------------------------
+const VOICE_BUCKET = "voice-messages";
+export const voiceSettings = () => rpc("voice_settings");
+export const acceptVoiceNotice = () => rpc("accept_voice_notice");
+export const reportVoice = (reportId) => rpc("admin_report_voice", { p_id: reportId });
+
+export async function uploadVoice(blob) {
+  const uid = myId();
+  if (!uid) throw new Error("Giriş gerekli");
+  const path = `${uid}/${crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2)}.m4a`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${VOICE_BUCKET}/${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken()}`, apikey: SUPABASE_KEY, "Content-Type": "audio/mp4", "x-upsert": "false" },
+    body: blob,
+  });
+  if (!res.ok) throw new Error("Ses yüklenemedi. Lütfen tekrar dene.");
+  return path;
+}
+
+export async function deleteVoice(path) {
+  try {
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${VOICE_BUCKET}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken()}`, apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+  } catch (_) { /* */ }
+}
+
+export async function sendVoiceToRoom(roomId, path, sec, replyToId) {
+  const row = { content: "", room_id: roomId, voice: path, voice_sec: sec };
+  if (replyToId) row.reply_to_id = replyToId;
+  check(await sb.from("messages").insert(row));
+}
+export const sendVoiceDm = (to, path, sec) => rpc("send_dm", { p_to: to, p_voice: path, p_voice_sec: sec });
+
+const voiceUrls = new Map();
+export async function voiceUrl(path) {
+  if (voiceUrls.has(path)) return voiceUrls.get(path);
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${VOICE_BUCKET}/${path}`, {
+    headers: { Authorization: `Bearer ${accessToken()}`, apikey: SUPABASE_KEY },
+  });
+  if (!res.ok) throw new Error("Ses açılamadı (süresi dolmuş olabilir).");
+  const url = URL.createObjectURL(await res.blob());
+  voiceUrls.set(path, url);
+  return url;
+}
+
+// 🎨 Duvar kâğıtları: sunucudaki varsayılan + sonradan eklenenler
+export const wallpapers = () => rpc("wallpapers");

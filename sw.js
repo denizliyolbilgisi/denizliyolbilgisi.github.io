@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.2.3-1";
+const VERSION = "dyb-1.2.4-1";
 
 const SHELL = [
   "./",
@@ -27,6 +27,10 @@ const SHELL = [
   "./js/screens/profile.js",
   "./js/screens/helps.js",
   "./js/screens/staff.js",
+  "./js/screens/voice.js",
+  "./js/screens/wallpaper.js",
+  "./js/wall.js",
+  "./img/duvar/logo.jpg",
   "./vendor/preact-htm.js",
   "./vendor/supabase.js",
   "./vendor/emoji/picker.js",

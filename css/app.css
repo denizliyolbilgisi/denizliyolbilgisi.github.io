@@ -670,3 +670,47 @@ textarea.input { resize: none; }
   display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: 15px; font-weight: 600; font-family: inherit; text-align: left; cursor: pointer; }
 .mm-menu button:first-child { border-top: 0; }
 .mm-menu button.gap { border-top: 6px solid var(--card-2); }
+
+/* ---------- 1.1.2.4: 🎨 Duvar kâğıdı ---------- */
+.has-wall, .screen.gradient.has-wall, body.walled { background: transparent; }
+.wall { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; pointer-events: none; }
+.wall i { position: absolute; inset: 0; background: var(--bg); }
+.has-wall .sender, .has-wall .day-chip span, .has-wall .sys-line span { text-shadow: 0 1px 2px var(--bg); }
+.wp-body { padding: 12px 14px calc(var(--safe-bottom) + 20px); display: flex; flex-direction: column; gap: 12px; }
+.wp-card { background: var(--card); border-radius: 16px; padding: 14px; opacity: .96; }
+.wp-card input[type=range] { width: 100%; margin-top: 10px; accent-color: #3D8BFF; }
+.wp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.wp-tile { background: none; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; font-family: inherit; }
+.wp-img { width: 100%; aspect-ratio: 0.56; border-radius: 14px; background: var(--card-2) center / cover no-repeat;
+  border: 1px solid var(--line); position: relative; display: flex; align-items: center; justify-content: center; }
+.wp-img.plain { background: var(--bg); }
+.wp-tile.on .wp-img { border: 3px solid #3D8BFF; }
+.wp-tile.on .wp-img::after { content: "✓"; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
+  background: #3D8BFF; color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.wp-own { color: var(--text); font-size: 14px; text-align: center; line-height: 1.4; }
+.wp-name { font-size: 13px; color: var(--text); background: color-mix(in srgb, var(--bg) 70%, transparent); border-radius: 6px; padding: 1px 6px; text-align: center; }
+.wp-tile.on .wp-name { font-weight: 800; }
+
+/* ---------- 1.1.2.4: 🎤 Sesli mesaj ---------- */
+.composer .mic { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--blue-2); color: #fff;
+  font-size: 22px; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  transition: transform .12s, background .12s; }
+.composer .mic.rec { background: #EF4444; transform: scale(1.18); box-shadow: 0 0 0 8px rgba(239,68,68,.22); }
+.composer .mic:disabled { opacity: .5; }
+.rec-bar { flex: 1; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 14px;
+  background: var(--card-2); -webkit-user-select: none; user-select: none; }
+.rec-bar b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.rec-bar b.warn { color: #EF4444; }
+.rec-dot { width: 12px; height: 12px; border-radius: 50%; background: #EF4444; animation: recblink 1.2s infinite; }
+@keyframes recblink { 50% { opacity: .2; } }
+.rec-hint { text-align: right; font-size: 14px; color: var(--muted); }
+.rec-hint.on { color: #EF4444; font-weight: 700; }
+.vb { min-width: 210px; }
+.vb-play { width: 42px; height: 42px; flex: none; border-radius: 50%; border: 0; background: rgba(127,127,127,.22); color: inherit;
+  font-size: 17px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.vb-track { height: 4px; border-radius: 2px; background: rgba(127,127,127,.35); overflow: hidden; }
+.vb-track i { display: block; height: 100%; background: currentColor; border-radius: 2px; transition: width .2s linear; }
+.vb-time { font-size: 13px; opacity: .85; margin-top: 5px; font-variant-numeric: tabular-nums; }
+.vb-keep { font-size: 11px; opacity: .6; margin-top: 3px; }
+.vb-expired { font-size: 15px; opacity: .75; }
+.vb-report { margin-top: 6px; background: var(--card-2); border-radius: 10px; padding: 10px; }
