@@ -77,7 +77,7 @@ export function ProfileScreen() {
             <div class="grow" style="min-width:0">
               <div class="pr-name">@${p.username || ""} ${roleBadge(p.role)}</div>
               <div class="pr-sub">${roleLabel(p.role)} • ${dateText(p.created_at)}'dan beri üye</div>
-              ${roomsAdmin.length > 0 && html`<div class="pr-sub">🔰 ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
+              ${roomsAdmin.length > 0 && html`<div class="pr-sub">🏠 ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
               ${p.bio && html`<div class="pr-bio">${p.bio}</div>`}
             </div>
           </div>
@@ -332,7 +332,7 @@ export function MemberProfileModal({ userId, onClose, onMessage }) {
         </div>
         ${p.bio && html`<div style="margin-top:8px;font-size:17px">📝 ${p.bio}</div>`}
         <div class="soft small" style="margin-top:8px">Üyelik: ${dateText(p.created_at)}</div>
-        ${roomsAdmin.length > 0 && html`<div class="soft small">🔰 Oda yöneticisi: ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
+        ${roomsAdmin.length > 0 && html`<div class="soft small">🏠 Oda görevi: ${roomsAdmin.map(roomTitle).join(", ")}</div>`}
         <div class="soft small">💬 ${p.message_count} mesaj • 📍 ${p.radar_count} radar • ✅ ${p.confirmed_count} onaylı</div>
         ${dm && html`
           <div style="margin-top:12px">

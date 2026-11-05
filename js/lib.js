@@ -185,15 +185,35 @@ export function durationText(sec) {
 // ---------------------------------------------------------------------------
 // Roller
 // ---------------------------------------------------------------------------
-export function roleRank(role) {
-  return { kurucu: 4, yonetici: 3, moderator: 2 }[role] || 1;
+// 1.1.2.3 yetki merdiveni: rütbe adları, rozetleri ve izinler SUNUCUDAN gelir (my_permissions)
+const ROLE_DEFAULTS = [
+  { role: "kurucu", sira: 6, guc: 10, ad: "Kurucu", rozet: "👑", renk: "#D4A017" },
+  { role: "yonetici", sira: 5, guc: 9, ad: "Yönetici", rozet: "🛡", renk: "#2563EB" },
+  { role: "admin", sira: 4, guc: 8, ad: "Administrator", rozet: "💠", renk: "#0891B2" },
+  { role: "moderator", sira: 3, guc: 7, ad: "Moderatör", rozet: "⭐", renk: "#7C3AED" },
+  { role: "rehber", sira: 2, guc: 2, ad: "Rehber", rozet: "🤝", renk: "#16A34A" },
+  { role: "uye", sira: 1, guc: 2, ad: "Üye", rozet: "", renk: "#64748B" },
+];
+let roleMap = Object.fromEntries(ROLE_DEFAULTS.map((r) => [r.role, r]));
+export const perms = { izinler: [], atanabilir: [] };
+/** Sunucudan gelen my_permissions sonucunu uygula (ve telefonda sakla) */
+export function applyPerms(p, save = true) {
+  if (!p) return;
+  perms.izinler = p.izinler || [];
+  perms.atanabilir = p.atanabilir || [];
+  if (p.roller && p.roller.length) roleMap = Object.fromEntries(p.roller.map((r) => [r.role, r]));
+  if (save) store.set("dyb_izinler", p);
 }
-export function roleBadge(role) {
-  return { kurucu: "👑", yonetici: "🛡", moderator: "⭐" }[role] || "";
-}
-export function roleLabel(role) {
-  return { kurucu: "Kurucu", yonetici: "Yönetici", moderator: "Moderatör" }[role] || "Üye";
-}
+applyPerms(store.get("dyb_izinler", null), false);
+/** Bu işlemi yapabilir miyim? (izin adları sunucudaki dyb_izinler tablosunda) */
+export const can = (izin) => perms.izinler.includes(izin);
+export const roleInfo = (role) => roleMap[role || "uye"] || roleMap.uye || ROLE_DEFAULTS[5];
+/** Merdivendeki sıra: kurucu 6 … üye 1 */
+export const roleRank = (role) => roleInfo(role).sira;
+export const roleBadge = (role) => roleInfo(role).rozet || "";
+export const roleLabel = (role) => roleInfo(role).ad;
+/** Odadaki güç (sunucudaki dyb_oda_guc ölçeği) */
+export const rolePower = (role) => roleInfo(role).guc;
 
 // ---------------------------------------------------------------------------
 // Kullanıcı adı kuralları (asıl kontrol sunucuda)

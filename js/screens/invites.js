@@ -1,5 +1,5 @@
 // Davetlerim: davet kodu üret, paylaş, kopyala, sil
-import { html, useState, useEffect, navigate, userMessage, agoText, roleRank, toast, copyText, parseTime } from "../lib.js";
+import { html, useState, useEffect, navigate, userMessage, agoText, roleRank, toast, copyText, parseTime, can } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, useInterval, useOnResume } from "../ui.js";
 
@@ -41,7 +41,7 @@ export function InvitesScreen() {
   const newH = api.cfgInt("invite_new_member_hours", 3);
   const waitH = api.cfgInt("invite_wait_hours", 3);
   let nextAllowed = null;
-  if (me && rank < 2) {
+  if (me && !can("sinirsiz_davet")) {
     const joined = parseTime(me.created_at);
     const last = parseTime(me.last_invite_at);
     const a = joined ? joined.getTime() + newH * 3600000 : 0;
@@ -111,7 +111,7 @@ export function InvitesScreen() {
       <${TopBar} title="👥 Davetlerim" onBack=${() => navigate("/menu")} />
       <div class="content">
         <div class="card soft">
-          ${rank >= 2
+          ${can("sinirsiz_davet")
             ? "Yetkili (moderatör / yönetici) olarak beklemeden sınırsız davet kodu üretebilirsin. Her kod tek kullanımlıktır."
             : `DYB'ye yalnızca davetle üye olunur. Güvendiğin kişilere kod oluştur. Her kod tek kullanımlıktır ve ${waitH} saatte bir yeni kod üretebilirsin. Yeni üyeler kayıttan sonraki ilk ${newH} saat kod üretemez.`}
         </div>

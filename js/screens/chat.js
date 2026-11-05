@@ -1,11 +1,11 @@
 // Sohbet odası: mesajlar, yanıt, fotoğraf albümü, şikayet, sabit mesaj, oda yöneticisi araçları
 import {
   html, useState, useEffect, useRef, useLayoutEffect, navigate, userMessage, chatTime, remainingText, isStillActive,
-  roleRank, roleBadge, toast, copyText, store, dayKey, dayLabel, typingText, charCount, takeChars,
+  roleRank, roleBadge, toast, copyText, store, dayKey, dayLabel, typingText, charCount, takeChars, can, rolePower,
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, PhotoAlbum, PhotoViewer, pickPhotos, longPress, swipeReply, useInterval, useOnResume } from "../ui.js";
-import { MemberProfileModal } from "./profile.js";
+import { WhoisModal, MessageMenu } from "./staff.js";
 
 const MAX_LENGTH = 1024;
 
@@ -101,7 +101,7 @@ export function ChatScreen({ roomId, focusId }) {
 
   const rank = roleRank(me?.role);
   // 🛡 Gizli odada sadece kurucu yönetir (gücü sunucu belirler)
-  const myPower = room.min_rank > 0 ? (room.my_power || 2) : Math.max(room.my_power || 2, rank * 2);
+  const myPower = room.min_rank > 0 ? (room.my_power || 2) : Math.max(room.my_power || 2, rolePower(me?.role));
   const secret = room.min_rank > 0;
 
   // ---------- "Yazıyor…" ----------
@@ -114,13 +114,13 @@ export function ChatScreen({ roomId, focusId }) {
     lastTypingRef.current = now;
     api.setTyping("oda:" + roomId).catch(() => {});
   }
-  const powerOf = (m) => Math.max(roleRank(m.profiles?.role) * 2, api.LEVELS[api.levelOf(room, m.user_id)]?.[2] || 0);
+  const powerOf = (m) => Math.max(rolePower(m.profiles?.role), api.LEVELS[api.levelOf(room, m.user_id)]?.[2] || 0);
   const label = (m) => senderLabel(m, room);
   // Sabitle, açıklama, sohbeti aç/kapat: kurucu, yönetici, 🏅 sorumlu, 🔰 yetkili (sunucu söyler)
   const canModerate = room.can_manage !== undefined ? !!room.can_manage : myPower >= 3;
   const canWriteClosed = myPower >= 3;
   // Odada en fazla susturma süresi: 🔹 1 sa, 🔰 3 sa, diğerleri 24 sa
-  const maxMute = rank >= 2 ? 1440 : ({ sorumlu: 1440, yetkili: 180, operator: 60 }[room.my_level] || 1440);
+  const maxMute = can("sustur") ? 1440 : ({ sorumlu: 1440, yetkili: 180, operator: 60 }[room.my_level] || 1440);
   const [lockOpen, setLockOpen] = useState(false);
   async function doLock(minutes) {
     setLockOpen(false);
@@ -335,7 +335,7 @@ export function ChatScreen({ roomId, focusId }) {
   let mentionBox = null;
   if (typing) {
     const q = typing[1].toLowerCase();
-    const all = [...(rank >= 3 ? [{ username: "herkes", role: null }] : []),
+    const all = [...(can("herkes_etiket") ? [{ username: "herkes", role: null }] : []),
       ...candidates.filter((c) => c.username !== myName)];
     const matches = all.filter((c) => c.username.startsWith(q)).slice(0, 5);
     if (matches.length) {
@@ -355,7 +355,7 @@ export function ChatScreen({ roomId, focusId }) {
 
   // ---------- Yazma alanı yerine uyarılar ----------
   const globalMuted = me && me.role !== "kurucu" && isStillActive(me.muted_until);
-  const roomMuted = isStillActive(room.muted_until) && rank < 4;
+  const roomMuted = isStillActive(room.muted_until) && rank < 6;
   let bottom;
   // Yazma kutusu açıkken mesaj sağa kaydırılarak yanıtlanabilir
   const canSwipeReply = !(globalMuted || roomMuted) && !(room.closed && !canWriteClosed) && !(room.read_only && myPower < 3);
@@ -523,30 +523,25 @@ export function ChatScreen({ roomId, focusId }) {
         const canManage = myPower >= 3 && myPower > powerOf(m);
         const canDelete = m.user_id === myId || canManage;
         const close = () => setMenuFor(null);
-        return html`
-          <${Modal} title=${label(m)} center=${false} onClose=${close}>
-            <div class="muted" style="margin-bottom:6px;max-height:4.5em;overflow:hidden">${api.previewText(m)}</div>
-            <div class="emoji-row">
-              ${(() => {
-                const mine = api.myReaction(m, myId);
-                // Benim tepkim hızlı listede yoksa başta görünsün
-                return [...(mine && !api.REACTIONS.includes(mine) ? [mine] : []), ...api.REACTIONS].slice(0, 6).map((e) => html`
-                  <button key=${e} class=${mine === e ? "on" : ""} onClick=${() => { close(); react(m, e); }}>${e}</button>`);
-              })()}
-              <button class="plus" title="Tüm emojiler" onClick=${() => { close(); setPickReactionFor(m); }}>➕</button>
-            </div>
-            <button class="list-btn" onClick=${() => { setReplyTo(m); setEditing(null); close(); }}>↩  Yanıtla</button>
-            ${api.editable(m, myId) && !(room.read_only && !canModerate) && html`<button class="list-btn"
-              onClick=${() => { setEditing(m); setReplyTo(null); setPicked([]); setInput(m.content || ""); caretRef.current = null; close(); }}>✏️  Düzenle</button>`}
-            ${m.edited_at && rank >= 2 && html`<button class="list-btn" onClick=${() => { setHistoryFor(m); close(); }}>📝  Düzenleme geçmişi</button>`}
-            ${m.content && m.content.trim() && html`<button class="list-btn" onClick=${async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); }}>📋  Kopyala</button>`}
-            ${m.photos && m.photos.length > 0 && !m.photos_expired && html`<button class="list-btn" onClick=${() => { setViewer({ msg: m, index: 0 }); close(); }}>🖼  Fotoğrafları aç</button>`}
-            ${m.user_id !== myId && html`<button class="list-btn" style="color:var(--amber)" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet Et</button>`}
-            ${canModerate && html`<button class="list-btn" onClick=${() => { close(); pin(m); }}>${m.id === room.pinned_message_id ? "📌  Sabitlemeyi kaldır" : "📌  Sabitle"}</button>`}
-            ${canManage && m.user_id !== myId && html`<button class="list-btn" style="color:var(--amber)" onClick=${() => { setMuteFor(m); close(); }}>🔇  Bu odada sustur / aç</button>`}
-            ${canDelete && html`<button class="list-btn" style="color:var(--red-soft)" onClick=${() => { setDeleteFor(m); close(); }}>🗑  Sil</button>`}
-            <button class="list-btn muted" onClick=${close}>Vazgeç</button>
-          </${Modal}>`;
+        const mine = api.myReaction(m, myId);
+        const isPinned = m.id === room.pinned_message_id;
+        // 1.1.2.3: sade menü (gruplar: 0 temel, 1 dikkat, 2 silme)
+        const actions = [
+          { title: "Yanıtla", icon: "↩️", group: 0, onClick: () => { setReplyTo(m); setEditing(null); close(); } },
+          m.content && m.content.trim() && { title: "Kopyala", icon: "📋", group: 0, onClick: async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); } },
+          api.editable(m, myId) && !(room.read_only && !canModerate) && { title: "Düzenle", icon: "✏️", group: 0,
+            onClick: () => { setEditing(m); setReplyTo(null); setPicked([]); setInput(m.content || ""); caretRef.current = null; close(); } },
+          m.photos && m.photos.length > 0 && !m.photos_expired && { title: "Fotoğrafları aç", icon: "🖼", group: 0, onClick: () => { setViewer({ msg: m, index: 0 }); close(); } },
+          canModerate && { title: isPinned ? "Sabitlemeyi kaldır" : "Sabitle", icon: "📌", group: 0, onClick: () => { close(); pin(m); } },
+          m.edited_at && can("sikayetler") && { title: "Düzenleme geçmişi", icon: "📝", group: 0, onClick: () => { setHistoryFor(m); close(); } },
+          m.user_id !== myId && { title: "Şikayet et", icon: "🚩", color: "var(--amber)", group: 1, onClick: () => { setReportFor(m); close(); } },
+          canManage && m.user_id !== myId && { title: "Bu odada sustur / aç", icon: "🔇", color: "var(--amber)", group: 1, onClick: () => { setMuteFor(m); close(); } },
+          canDelete && { title: "Sil", icon: "🗑", color: "var(--red-soft)", group: 2, onClick: () => { setDeleteFor(m); close(); } },
+        ].filter(Boolean);
+        return html`<${MessageMenu} sender=${label(m)} preview=${api.previewText(m)} mine=${mine}
+          reactions=${[...(mine && !api.REACTIONS.includes(mine) ? [mine] : []), ...api.REACTIONS].slice(0, 6)}
+          onReact=${(e) => { close(); react(m, e); }} onMore=${() => { close(); setPickReactionFor(m); }}
+          actions=${actions} onClose=${close} />`;
       })()}
 
       ${pickReactionFor && html`
@@ -558,7 +553,8 @@ export function ChatScreen({ roomId, focusId }) {
           onRemove=${(e) => { const m = reactorsFor; setReactorsFor(null); react(m, e); }} />`}
       ${historyFor && html`<${EditHistoryModal} msg=${historyFor} onClose=${() => setHistoryFor(null)} />`}
 
-      ${profileFor && html`<${MemberProfileModal} userId=${profileFor} onClose=${() => setProfileFor(null)} />`}
+      ${profileFor && html`<${WhoisModal} userId=${profileFor} room=${roomId} onClose=${() => setProfileFor(null)}
+          onMessage=${(u) => { setProfileFor(null); navigate("/mesaj/" + u); }} />`}
 
       ${reportFor && html`<${ReportDialog} msg=${reportFor} label=${label(reportFor)} onClose=${() => setReportFor(null)}
           onError=${setError} />`}

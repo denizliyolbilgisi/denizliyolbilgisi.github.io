@@ -1,5 +1,5 @@
 // Karşılama menüsü: Harita + sohbet odaları (küçük kartlar), altta kısayollar
-import { html, useState, useEffect, useRef, navigate, agoText, remainingText, isStillActive, roleRank, toast, store } from "../lib.js";
+import { html, useState, useEffect, useRef, navigate, agoText, remainingText, isStillActive, roleRank, toast, store, can } from "../lib.js";
 import * as api from "../api.js";
 import { Modal, useInterval, useOnResume, useLive } from "../ui.js";
 import { DENIZLI, FETCH_RADIUS_M } from "../config.js";
@@ -65,6 +65,7 @@ export function MenuScreen({ onBanned }) {
   // Son bilinen rütbe saklanır: bağlantı koparsa Yönetim düğmesi kaybolmaz
   const roleKey = "dyb_son_rutbe_" + (api.myId() || "");
   const [knownRank, setKnownRank] = useState(() => store.get(roleKey, 1));
+  const [canAdmin, setCanAdmin] = useState(() => can("yonetim_paneli"));   // telefonda saklı son izinler
   const retry = useRef(0);
 
   async function refresh() {
@@ -83,7 +84,11 @@ export function MenuScreen({ onBanned }) {
         store.set(roleKey, rk);
       }
       if (p && p.banned_at && p.role !== "kurucu") onBanned(p);
-      if (p && roleRank(p.role) >= 2) api.openReportCount().then(setOpenReports).catch(() => {});
+      // 1.1.2.3: rütbe ve izinler sunucudan
+      api.refreshPerms().then(() => {
+        setCanAdmin(can("yonetim_paneli"));
+        if (can("sikayetler")) api.openReportCount().then(setOpenReports).catch(() => {});
+      }).catch(() => {});
       // Puan değiştiyse rütbe atladı mı bak (kutlama bir kez gösterilir)
       if (p && p.points !== lastPoints.current) {
         lastPoints.current = p.points;
@@ -182,7 +187,7 @@ export function MenuScreen({ onBanned }) {
   const h = new Date().getHours();
   const greet = h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
   const tileSub = (r) => {
-    if (isStillActive(r.muted_until) && rank < 4) return "🔇 Susturuldun";
+    if (isStillActive(r.muted_until) && rank < 6) return "🔇 Susturuldun";
     if (r.id === "eczane") return "Her gün güncel liste";
     if (r.last_at) return "Son: " + agoText(r.last_at);
     return roomsLoaded ? "Henüz mesaj yok" : chatError ? "Bilgi alınamadı" : "Yükleniyor…";
@@ -256,7 +261,7 @@ export function MenuScreen({ onBanned }) {
         <button class="on"><span class="i">🏠</span>Ana Sayfa</button>
         <button onClick=${() => navigate("/mesajlar")}><span class="i">✉️</span>Mesajlar
           ${dmUnread > 0 && html`<span class="count">${dmUnread > 9 ? "9+" : dmUnread}</span>`}</button>
-        ${rank >= 2 && html`<button onClick=${() => navigate("/yonetim")}><span class="i">🛡</span>Yönetim
+        ${canAdmin && html`<button onClick=${() => navigate("/yonetim")}><span class="i">🛡</span>Yönetim
           ${openReports > 0 && html`<span class="count">${openReports > 9 ? "9+" : openReports}</span>`}</button>`}
         <button onClick=${() => navigate("/ayarlar")}><span class="i">⚙️</span>Ayarlar</button>
         <button onClick=${() => navigate("/profil")}><span class="i">👤</span>Profil</button>

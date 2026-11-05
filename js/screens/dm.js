@@ -2,7 +2,7 @@
 import { html, useState, useEffect, useRef, navigate, userMessage, chatTime, roleBadge, toast, copyText, dayKey, dayLabel, typingText, presenceText, charCount, takeChars } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, longPress, useInterval, useOnResume, useLive } from "../ui.js";
-import { MemberProfileModal } from "./profile.js";
+import { WhoisModal, MessageMenu } from "./staff.js";
 import { EmojiPanel, ReportDialog } from "./chat.js";
 
 const MAX_LENGTH = 1024;
@@ -382,26 +382,19 @@ export function DmChatScreen({ userId }) {
         const mine = m.sender_id === myId;
         const my = (m.reactions || []).find((r) => r.user_id === myId)?.emoji || null;
         const close = () => setMenuFor(null);
-        return html`
-          <${Modal} title=${mine ? "Mesajın" : name} center=${false} onClose=${close}>
-            <div class="muted" style="margin-bottom:6px;max-height:4.5em;overflow:hidden">${m.content}</div>
-            ${m.deleted ? html`
-              <div class="soft small" style="margin-bottom:6px">Gönderen bu mesajı sildi. Uygunsuz bir şey yazdıysa şikayet edebilirsin; yönetim silinen mesajın aslını görebilir.</div>
-              <button class="list-btn" style="color:var(--amber)" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>
-              <button class="list-btn muted" onClick=${close}>Vazgeç</button>` : html`
-            <div class="emoji-row">
-              ${[...(my && !api.REACTIONS.includes(my) ? [my] : []), ...api.REACTIONS].slice(0, 6).map((e) => html`
-                <button key=${e} class=${my === e ? "on" : ""} onClick=${() => { close(); react(m, e); }}>${e}</button>`)}
-              <button class="plus" onClick=${() => { close(); setPickReactionFor(m); }}>➕</button>
-            </div>
-            ${mine && api.editable({ user_id: m.sender_id, created_at: m.created_at }, myId) && !(s && s.reason) && html`
-              <button class="list-btn" onClick=${() => { setEditing(m); setInput(m.content); caretRef.current = null; close(); }}>✏️  Düzenle</button>`}
-            <button class="list-btn" onClick=${async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); }}>📋  Kopyala</button>
-            ${mine
-              ? html`<button class="list-btn" style="color:var(--red-soft)" onClick=${() => { setDeleteFor(m); close(); }}>🗑  Sil</button>`
-              : html`<button class="list-btn" style="color:var(--amber)" onClick=${() => { setReportFor(m); close(); }}>🚩  Şikayet et</button>`}
-            <button class="list-btn muted" onClick=${close}>Vazgeç</button>`}
-          </${Modal}>`;
+        // 1.1.2.3: odalardaki gibi sade menü
+        const actions = [
+          !m.deleted && mine && api.editable({ user_id: m.sender_id, created_at: m.created_at }, myId) && !(s && s.reason) &&
+            { title: "Düzenle", icon: "✏️", group: 0, onClick: () => { setEditing(m); setInput(m.content); caretRef.current = null; close(); } },
+          !m.deleted && { title: "Kopyala", icon: "📋", group: 0, onClick: async () => { close(); toast((await copyText(m.content)) ? "Kopyalandı" : "Kopyalanamadı"); } },
+          !mine && { title: "Şikayet et", icon: "🚩", color: "var(--amber)", group: 1, onClick: () => { setReportFor(m); close(); } },
+          mine && !m.deleted && { title: "Sil", icon: "🗑", color: "var(--red-soft)", group: 2, onClick: () => { setDeleteFor(m); close(); } },
+        ].filter(Boolean);
+        return html`<${MessageMenu} sender=${mine ? "Mesajın" : name} mine=${my}
+          preview=${m.deleted ? "Gönderen bu mesajı sildi. Yönetim silinen mesajın aslını görebilir." : m.content}
+          reactions=${m.deleted ? [] : [...(my && !api.REACTIONS.includes(my) ? [my] : []), ...api.REACTIONS].slice(0, 6)}
+          onReact=${(e) => { close(); react(m, e); }} onMore=${() => { close(); setPickReactionFor(m); }}
+          actions=${actions} onClose=${close} />`;
       })()}
 
       ${pickReactionFor && html`
@@ -433,7 +426,7 @@ export function DmChatScreen({ userId }) {
             try { await api.hideDmConversation(convId); navigate("/mesajlar"); } catch (e) { setErr(userMessage(e)); }
           }} />`}
 
-      ${showProfile && html`<${MemberProfileModal} userId=${userId}
+      ${showProfile && html`<${WhoisModal} userId=${userId}
           onClose=${() => { setShowProfile(false); loadStatus(); }}
           onMessage=${() => { setShowProfile(false); loadStatus(); }} />`}
     </div>`;

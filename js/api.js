@@ -1,5 +1,5 @@
 // Sunucu (Supabase) işlemleri – Android'deki Repository dosyalarının karşılığı
-import { sb } from "./lib.js";
+import { sb, applyPerms } from "./lib.js";
 import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
 
 /** Hata varsa fırlat, yoksa veriyi döndür */
@@ -142,7 +142,8 @@ export const roomSetDescription = (room, text) => rpc("room_set_description", { 
 export const setRoomAdmin = (room, user, on) => rpc("admin_set_room_admin", { p_room: room, p_user: user, p_on: on });
 // ---------- 1.1.9: oda rütbeleri, sohbeti aç/kapat, Odalar sekmesi ----------
 export const SYSTEM_ID = "b0700000-0000-4000-8000-00000000d1b0";
-export const LEVELS = { sorumlu: ["🏅", "Oda Sorumlusu", 5], yetkili: ["🔰", "Oda Yetkilisi", 4], operator: ["🔹", "Operatör", 3] };
+// 1.1.2.3: anahtarlar aynı, adlar yeni (Oda Yöneticisi odada tek kişi)
+export const LEVELS = { sorumlu: ["🏠", "Oda Yöneticisi", 5], yetkili: ["⚡", "Süper Operatör", 4], operator: ["🔹", "Operatör", 3] };
 export const levelOf = (room, userId) => {
   const i = (room.admin_ids || []).indexOf(userId);
   return i >= 0 ? ((room.admin_levels || [])[i] || "yetkili") : null;
@@ -567,3 +568,17 @@ export async function eczaneler() {
     .select("id, ilce, ad, adres, telefon, baslangic, bitis, lat, lng")
     .order("ilce").order("ad"));
 }
+
+// ---------------------------------------------------------------------------
+// 1.1.2.3 Yetki merdiveni
+// ---------------------------------------------------------------------------
+/** Rütbem ve izinlerim (sunucudan); lib.js'deki can() ile kullanılır */
+export async function refreshPerms() {
+  const p = await rpc("my_permissions");
+  applyPerms(p);
+  return p;
+}
+/** 👥 Üyeler: sade alfabetik liste (Rehber ve üstü) */
+export const memberList = async () => (await rpc("member_list")) || [];
+/** Kişi kartı (/whois); room verilirse o odada verilebilecek görevler de gelir */
+export const whois = (userId, room) => rpc("whois", room ? { p_user: userId, p_room: room } : { p_user: userId });

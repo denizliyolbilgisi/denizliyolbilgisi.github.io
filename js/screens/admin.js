@@ -1,17 +1,16 @@
 // Yönetim: Üyeler (e-posta/süre sadece kurucu+yönetici), Şikayetler, Son İşlemler, oda yöneticisi atama
 import {
   html, useState, useEffect, navigate, userMessage, agoText, dateText, remainingText, isStillActive,
-  roleRank, roleLabel, roleBadge, durationText, parseTime, copyText, toast,
+  roleRank, roleLabel, roleBadge, durationText, parseTime, copyText, toast, can, roleInfo,
 } from "../lib.js";
 import * as api from "../api.js";
 import { TopBar, Modal, Spinner, Switch } from "../ui.js";
+import { MemberSheet, SimpleMemberRow } from "./staff.js";
 
 const MUTE_OPTIONS = [["1 saat", 60], ["5 saat", 300], ["12 saat", 720], ["24 saat", 1440],
   ["15 gün", 15 * 1440], ["30 gün", 30 * 1440], ["Süresiz", null]];
-const ROLE_CHOICES = [["yonetici", "🛡  Yönetici Yap"], ["moderator", "⭐  Moderatör Yap"], ["uye", "👤  Normal Üye Yap"]];
 const ACTIVITY_FILTERS = [[null, "Tümü"], ["uyelik", "👤 Üyelik"], ["mesaj", "💬 Mesaj"], ["radar", "🚨 Radar"],
   ["davet", "🎟 Davet"], ["sikayet", "🚩 Şikayet"], ["yonetim", "🛡 Yönetim"]];
-const ROLE_PILL = { kurucu: ["👑 Kurucu", "#B8860B"], yonetici: ["🛡 Yönetici", "#1F6FEB"], moderator: ["⭐ Moderatör", "#7B4DDB"] };
 
 const name = (m) => (m.username ? "@" + m.username : "(ad seçmedi)");
 const isMuted = (m) => m.role !== "kurucu" && isStillActive(m.muted_until);
@@ -55,9 +54,12 @@ export function AdminScreen({ startTab }) {
         const p = await api.me();
         const rk = roleRank(p?.role);
         setMyRank(rk);
-        setMembers(await api.adminMembers());
-        if (rk >= 3) api.adminPasswordRequests().then((l) => setRequestCount(l.length)).catch(() => {});
-        api.openReportCount().then(setOpenCount).catch(() => {});
+        await api.refreshPerms().catch(() => {});
+        // Rehber sadece sade listeyi görür; ayrıntılar moderatör ve üstüne
+        if (can("uye_detay")) setMembers(await api.adminMembers());
+        else { setSort(2); setMembers(await api.memberList()); }
+        if (can("sifre_yenile")) api.adminPasswordRequests().then((l) => setRequestCount(l.length)).catch(() => {});
+        if (can("sikayetler")) api.openReportCount().then(setOpenCount).catch(() => {});
         api.roomsOverview().then((l) => l.length && setRooms(l)).catch(() => {});
       } catch (e) {
         setInfo({ err: true, text: "Üyeler yüklenemedi: " + userMessage(e) });
@@ -74,10 +76,12 @@ export function AdminScreen({ startTab }) {
     }).catch((e) => setInfo({ err: true, text: userMessage(e) })).finally(() => setWorking(false));
   }
 
-  const tabs = [["uyeler", "Üyeler"], ["sikayet", openCount > 0 ? `Şikayetler (${openCount})` : "Şikayetler"]];
-  if (myRank >= 3) tabs.push(["talep", requestCount > 0 ? `🔑 Talepler (${requestCount})` : "🔑 Talepler"]);
-  if (myRank >= 4) tabs.push(["odalar", "🏠 Odalar"]);   // 1.1.2.0: sadece kurucu
-  if (myRank >= 3) tabs.push(["islem", "Son İşlemler"]);
+  // 1.1.2.3: sekmeler sunucudaki izinlere göre
+  const tabs = [["uyeler", "Üyeler"]];
+  if (can("sikayetler")) tabs.push(["sikayet", openCount > 0 ? `Şikayetler (${openCount})` : "Şikayetler"]);
+  if (can("sifre_yenile")) tabs.push(["talep", requestCount > 0 ? `🔑 Talepler (${requestCount})` : "🔑 Talepler"]);
+  if (can("oda_ayarlari")) tabs.push(["odalar", "🏠 Odalar"]);
+  if (can("son_islemler")) tabs.push(["islem", "Son İşlemler"]);
   const activeTab = tabs.some(([k]) => k === tab) ? tab : "uyeler";
   // En yeni Android sürümü: üyelerin kullandığı en yüksek sürüm
   const latestCode = Math.max(0, ...(members || []).map((m) => m.app_version_code || 0));
@@ -87,7 +91,7 @@ export function AdminScreen({ startTab }) {
   let list = (members || []).filter((m) => !q || (m.username || "").includes(q) || (m.invited_by || "").includes(q) ||
     (m.email || "").toLowerCase().includes(q));
   if (sort === 1) list = [...list].sort((a, b) => (b.usage_7d || 0) - (a.usage_7d || 0));
-  if (sort === 2) list = [...list].sort((a, b) => (parseTime(b.last_seen_at)?.getTime() || 0) - (parseTime(a.last_seen_at)?.getTime() || 0));
+  if (sort === 2) list = [...list].sort((a, b) => (a.username || "~").localeCompare(b.username || "~", "tr"));   // 👥 Üyeler
   if (sort === 3) list = list.filter((m) => m.app_version_code && m.app_version_code < latestCode);
 
   return html`
@@ -113,43 +117,29 @@ export function AdminScreen({ startTab }) {
         ${activeTab === "islem" && html`<${ActivityTab} user=${activityUser} reload=${reload} onClearUser=${() => setActivityUser(null)} onInfo=${setInfo} />`}
 
         ${activeTab === "uyeler" && html`
-          <input class="input" placeholder=${myRank >= 3 ? "Üye ara (@ad ya da e-posta)" : "Üye ara (@ad)"} value=${search}
+          <input class="input" placeholder=${can("eposta_gor") ? "Üye ara (@ad ya da e-posta)" : "Üye ara (@ad)"} value=${search}
             onInput=${(e) => setSearch(e.target.value)} />
-          ${myRank >= 3 && html`
+          ${can("uye_detay") && html`
             <div class="chips">
-              ${["Rütbe", "⏱ En aktif", "👁 Son görülen", "📲 Eski"].map((t, i) => html`
+              ${["Rütbe", "⏱ En aktif", "👥 Üyeler", "📲 Eski"].map((t, i) => html`
                 <button key=${i} class=${"chip" + (sort === i ? " on" : "")} onClick=${() => setSort(i)}>${t}</button>`)}
             </div>`}
           ${members === null ? html`<${Spinner} />` : list.length === 0 ? html`<div class="center muted">Üye bulunamadı</div>`
-            : list.map((m) => html`<${MemberCard} key=${m.id} m=${m} showPrivate=${myRank >= 3} latestCode=${latestCode} onClick=${() => setSelected(m)} />`)}
+            : sort === 2 ? html`<div class="st-list">${list.map((m) => html`<${SimpleMemberRow} key=${m.id} m=${m}
+                onClick=${() => can("uye_detay") && setSelected(m)} onMessage=${() => navigate("/mesaj/" + m.id)} />`)}</div>`
+            : list.map((m) => html`<${MemberCard} key=${m.id} m=${m} showPrivate=${can("kullanim_gor")} latestCode=${latestCode} onClick=${() => setSelected(m)} />`)}
         `}
       </div>
 
-      ${selected && html`
-        <${Modal} title=${name(selected)} onClose=${() => setSelected(null)}
-          actions=${html`<button class="btn outline" onClick=${() => setSelected(null)}>Kapat</button>`}>
-          <div style="white-space:pre-wrap;font-size:16px">${statusText(selected)}</div>
-          ${myRank >= 3 && html`<${UsageDetail} userId=${selected.id} />`}
-          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
-            ${myRank >= 3 && html`<button class="btn block" onClick=${() => { setActivityUser(selected); setSelected(null); setTab("islem"); }}>📋  İşlemlerini Gör</button>`}
-            ${myRank <= roleRank(selected.role) ? html`<div class="bold">Bu üyeye işlem yapma yetkin yok.</div>` : html`
-              ${isMuted(selected)
-                ? html`<button class="btn block green" disabled=${working} onClick=${() => { const m = selected; setSelected(null); run(`${name(m)} artık yazabilir.`, () => api.adminUnmute(m.id)); }}>🔊  Susturmayı Kaldır</button>`
-                : html`<button class="btn block orange" disabled=${working} onClick=${() => { setMuteTarget({ member: selected }); setSelected(null); }}>🔇  Sustur</button>`}
-              ${myRank >= 3 && (isBanned(selected)
-                ? html`<button class="btn block green" disabled=${working} onClick=${() => { const m = selected; setSelected(null); run(`${name(m)} yasağı kaldırıldı.`, () => api.adminUnban(m.id)); }}>✅  Yasağı Kaldır</button>`
-                : html`<button class="btn block red" disabled=${working} onClick=${() => { setBanTarget(selected); setSelected(null); }}>⛔  Yasakla</button>`)}
-              ${myRank >= 3 && roleRank(selected.role) < 4 && html`<button class="btn block teal" disabled=${working}
-                onClick=${() => { setResetTarget(selected); setSelected(null); }}>🔑  Şifreyi Yenile</button>`}
-              ${myRank >= 3 && html`
-                ${myRank >= 4 && html`<div class="muted small" style="margin-top:6px">🏅 🔰 🔹 Oda rütbeleri: Yönetim → 🏠 Odalar sekmesinden verilir.</div>`}
-                <div class="bold" style="margin-top:6px">Rol:</div>
-                ${ROLE_CHOICES.filter(([role]) => roleRank(role) < myRank && role !== selected.role).map(([role, label]) => html`
-                  <button key=${role} class="btn block purple" disabled=${working} onClick=${() => { setRoleTarget({ m: selected, role }); setSelected(null); }}>${label}</button>`)}
-              `}
-            `}
-          </div>
-        </${Modal}>`}
+      ${selected && html`<${MemberSheet} m=${selected} myRank=${myRank} working=${working} onClose=${() => setSelected(null)}
+          onActivity=${() => { setActivityUser(selected); setSelected(null); setTab("islem"); }}
+          onMute=${() => { setMuteTarget({ member: selected }); setSelected(null); }}
+          onUnmute=${() => { const m = selected; setSelected(null); run(`${name(m)} artık yazabilir.`, () => api.adminUnmute(m.id)); }}
+          onBan=${() => { setBanTarget(selected); setSelected(null); }}
+          onUnban=${() => { const m = selected; setSelected(null); run(`${name(m)} yasağı kaldırıldı.`, () => api.adminUnban(m.id)); }}
+          onReset=${() => { setResetTarget(selected); setSelected(null); }}
+          onRole=${(role) => { setRoleTarget({ m: selected, role }); setSelected(null); }}
+          onMessage=${() => { const m = selected; setSelected(null); navigate("/mesaj/" + m.id); }} />`}
 
       ${muteTarget && html`<${MuteDialog} target=${muteTarget} myRank=${myRank} onClose=${() => setMuteTarget(null)}
           onConfirm=${(label, minutes, why) => {
@@ -228,13 +218,14 @@ function statusText(m) {
 
 function MemberCard({ m, showPrivate, latestCode, onClick }) {
   const border = isBanned(m) ? "#D32F2F" : isMuted(m) ? "#E07B00" : "";
-  const pill = ROLE_PILL[m.role];
+  const ri = roleInfo(m.role);
+  const pill = ri.role === "uye" ? null : [`${ri.rozet} ${ri.ad}`.trim(), ri.renk];
   return html`
     <div class="card member" style=${border ? `border-color:${border}` : ""} onClick=${onClick}>
       <div class="row wrap">
         <div class="name grow">${name(m)}</div>
         ${pill && html`<span class="pill" style=${`background:${pill[1]}`}>${pill[0]}</span>`}
-        ${(m.room_admin_of || []).length > 0 && html`<span class="pill" style="background:#2E7D5B">🔰</span>`}
+        ${(m.room_admin_of || []).length > 0 && html`<span class="pill" style="background:#2E7D5B">🏠</span>`}
         ${isBanned(m) ? html`<span class="pill" style="background:#D32F2F">⛔ Yasaklı</span>`
           : isMuted(m) ? html`<span class="pill" style="background:#E07B00">🔇</span>` : null}
       </div>
@@ -277,7 +268,7 @@ function UsageDetail({ userId }) {
 }
 
 function MuteDialog({ target, myRank, onClose, onConfirm }) {
-  const options = myRank >= 3 ? MUTE_OPTIONS : MUTE_OPTIONS.filter(([, m]) => m !== null && m <= 1440);
+  const options = can("yasakla") ? MUTE_OPTIONS : MUTE_OPTIONS.filter(([, m]) => m !== null && m <= 1440);
   const [choice, setChoice] = useState(0);
   const [reason, setReason] = useState("");
   return html`
@@ -288,7 +279,7 @@ function MuteDialog({ target, myRank, onClose, onConfirm }) {
           onClick=${() => onConfirm(options[choice][0], options[choice][1], reason.trim())}>Sustur</button>`,
       ]}>
       <div class="bold">Süre:</div>
-      ${myRank < 3 && html`<div class="small muted">Moderatör en fazla 24 saat susturabilir.</div>`}
+      ${!can("yasakla") && html`<div class="small muted">Moderatör en fazla 24 saat susturabilir.</div>`}
       ${options.map(([label], i) => html`
         <label class="choice" key=${label}><input type="radio" name="msure" checked=${choice === i} onChange=${() => setChoice(i)} />${label}</label>`)}
       <input class="input" maxlength="200" placeholder="Sebep (üye görecek) – örn: Küfür – kural 3" value=${reason}
@@ -461,8 +452,8 @@ function ActivityTab({ user, reload, onClearUser, onInfo }) {
 // =====================================================================
 // 🏠 Odalar: görünür / üyeler yazabilir / bildirim, ad ve amaç, sohbeti aç-kapat, oda rütbeleri
 // =====================================================================
-const LEVEL_CHOICES = [["sorumlu", "🏅 Oda Sorumlusu", "Sohbeti aç/kapat, sabitle, sil, 24 saate kadar sustur"],
-  ["yetkili", "🔰 Oda Yetkilisi", "Sohbeti aç/kapat, sabitle, sil, 3 saate kadar sustur"],
+const LEVEL_CHOICES = [["sorumlu", "🏠 Oda Yöneticisi (odada tek)", "Süper operatör ve operatör atar, sohbeti aç/kapat, sabitle, 24 saate kadar sustur"],
+  ["yetkili", "⚡ Süper Operatör", "Operatör atar, sohbeti aç/kapat, sabitle, 3 saate kadar sustur"],
   ["operator", "🔹 Operatör", "Mesaj sil, 1 saate kadar sustur"]];
 
 function RoomsTab({ members, myRank, onInfo }) {
