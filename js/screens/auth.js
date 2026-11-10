@@ -184,7 +184,7 @@ export function RegisterScreen() {
     setConfirm(false);
     setBusy(true);
     setMsg(null);
-    const c = code.trim().toUpperCase();
+    const c = api.cleanInviteCode(code);   // 1.1.2.5: * " ' ve boşluklar temizlenir
     try {
       let ok;
       try {

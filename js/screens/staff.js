@@ -2,6 +2,7 @@
 import { html, useState, useEffect, userMessage, dateText, can, perms, roleInfo, roleRank, agoText } from "../lib.js";
 import * as api from "../api.js";
 import { Spinner } from "../ui.js";
+import { VideoEditorToggle, VideoEditorRowFor } from "./videos.js";
 
 const AVATAR = ["#0D9488", "#2563EB", "#7C3AED", "#DB2777", "#EA580C", "#0891B2"];
 export function avatarColor(key) {
@@ -105,6 +106,7 @@ export function MemberSheet({ m, myRank, working, onClose, onActivity, onMute, o
           <div class="st-muted st-xs" style="margin-top:6px">Sadece kendi rütbenin altındakileri atayabilirsin.</div>
         </div>`}
       ${!canAct && html`<div class="st-muted st-small">Bu üyeye işlem yapma yetkin yok.</div>`}
+      ${can("video_editor_ata") && html`<${VideoEditorRowFor} userId=${m.id} />`}
       ${canAct && can("yasakla") && html`
         <button class=${"st-danger" + (banned ? " ok" : "")} disabled=${working} onClick=${banned ? onUnban : onBan}>
           ${banned ? "✅  Yasağı kaldır" : "⛔  Yasakla"}</button>`}
@@ -165,6 +167,7 @@ export function WhoisModal({ userId, room, onClose, onMessage }) {
                 disabled=${busy || (w.room_level || "") === lv} onClick=${() => setLevel(lv)}>${lv ? api.LEVELS[lv].slice(0, 2).join(" ") : "Görev yok"}</button>`)}
             </div>
           </div>`}
+        ${w.can_set_video_editor && html`<${VideoEditorToggle} userId=${w.id} on=${!!w.video_editor} onChange=${(v) => setW({ ...w, video_editor: v })} />`}
         ${err && html`<div class="msg err">${err}</div>`}
         <div class="st-actions">
           ${!w.is_me && onMessage && html`<button class="btn" onClick=${() => onMessage(w.id)}>✉️  Mesaj gönder</button>`}

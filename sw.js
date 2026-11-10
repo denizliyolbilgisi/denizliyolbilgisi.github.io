@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.2.4-2";
+const VERSION = "dyb-1.2.5-1";
 
 const SHELL = [
   "./",
@@ -30,6 +30,7 @@ const SHELL = [
   "./js/screens/voice.js",
   "./js/screens/wallpaper.js",
   "./js/wall.js",
+  "./js/screens/videos.js",
   "./img/duvar/logo.jpg",
   "./vendor/preact-htm.js",
   "./vendor/supabase.js",
@@ -100,6 +101,8 @@ self.addEventListener("push", (event) => {
   } else if (type === "dm") {
     url = d.sender_id ? `./#/mesaj/${encodeURIComponent(d.sender_id)}` : "./#/mesajlar";   // özel mesaj
     tag = "dm-" + (d.sender_id || "");
+  } else if (type === "video") {
+    url = "./#/videolar";                       // 🎬 yeni eğitici video
   } else if (type === "sifre") {
     url = "./#/yonetim?tab=sifre";              // şifre yenileme talebi
     tag = "sifre";

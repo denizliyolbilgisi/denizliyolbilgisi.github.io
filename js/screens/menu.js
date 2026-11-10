@@ -7,6 +7,7 @@ import { enablePush, pushConfigured, pushSupported, permission } from "../push.j
 import { RankUpModal } from "./profile.js";
 import { WallLayer, useWall, NONE, refresh as refreshWall } from "../wall.js";
 import { refreshVoiceSettings } from "./voice.js";
+import { VideoHomeCard, refreshVideos } from "./videos.js";
 
 const ROOM_COLORS = {
   trafik: ["#FFB020", "#E07B00"],
@@ -90,6 +91,7 @@ export function MenuScreen({ onBanned }) {
       // 1.1.2.4: varsayılan duvar kâğıdı + sesli mesaj ayarları sunucudan
       refreshWall();
       refreshVoiceSettings();
+      refreshVideos();   // 🎬 1.1.2.5
       // 1.1.2.3: rütbe ve izinler sunucudan
       api.refreshPerms().then(() => {
         setCanAdmin(can("yonetim_paneli"));
@@ -254,6 +256,8 @@ export function MenuScreen({ onBanned }) {
             </button>`;
         })}
       </div>
+
+      <${VideoHomeCard} />
 
       ${muted && html`
         <div class="card" style="margin:14px 16px 0;background:var(--red-box);border-color:#FF6B6B">

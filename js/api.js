@@ -642,3 +642,31 @@ export const myInviteShare = () => rpc("my_invite_share");
 export async function inviteShareText(code) {
   try { return await rpc("invite_share_text", { p_code: code }); } catch (_) { return null; }
 }
+
+// 1.1.2.5: yapıştırılan davet kodunu temizle: *DYB-6F5EC0*, "dyb-6f5ec0", "Davet kodun: DYB-6F5EC0" → DYB-6F5EC0
+export function cleanInviteCode(raw) {
+  const up = String(raw || "").replace(/i/g, "I").replace(/İ/g, "I").replace(/ı/g, "I").toUpperCase();
+  // Tüm davet mesajı yapıştırıldıysa kod en sondadır ("DYB - Denizli…" başlığı değil)
+  const all = [...up.matchAll(/DYB\s*[-–—_]?\s*([A-Z0-9]{4,12})(?![A-Z0-9])/g)];
+  if (all.length) return "DYB-" + all[all.length - 1][1];
+  return up.replace(/[^A-Z0-9-]/g, "");
+}
+
+// ---------------------------------------------------------------------------
+// 1.1.2.5: 🎬 Eğitici Videolar (YouTube'da durur, uygulamada YouTube oynatıcısıyla gösterilir)
+// ---------------------------------------------------------------------------
+export const videosSummary = () => rpc("videos_summary");
+export const videosFeed = (before) => rpc("videos_feed", { p_before: before ?? null, p_limit: 20 });
+export const videoAdd = (url, title, duration, isShort) =>
+  rpc("video_add", { p_url: url, p_title: title, p_duration: duration || null, p_is_short: !!isShort });
+export const videoDelete = (id) => rpc("video_delete", { p_id: id });
+export const videoLike = (id) => rpc("video_like", { p_id: id });
+export const videoView = (id) => rpc("video_view", { p_id: id }).catch(() => null);
+export const setVideoNotify = (on) => rpc("set_video_notify", { p_on: on });
+export const setVideoEditor = (user, on) => rpc("set_video_editor", { p_user: user, p_on: on });
+export function youtubeId(url) {
+  const t = String(url || "").trim();
+  const m = t.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/|\/v\/)([A-Za-z0-9_-]{11})/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{11}$/.test(t) ? t : null;
+}

@@ -4,6 +4,7 @@ import * as api from "../api.js";
 import { themePref, setThemePref, textLevel, setTextLevel, TEXT_NAMES } from "../theme.js";
 import { TopBar, Modal, Spinner, Switch, useInterval } from "../ui.js";
 import { APP_VERSION } from "../config.js";
+import { useVideoSummary, refreshVideos } from "./videos.js";
 import { currentId as wallId, findItem as wallItem, PHOTO as WALL_PHOTO, NONE as WALL_NONE } from "../wall.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
 
@@ -19,6 +20,7 @@ function statusText(until) {
 }
 
 export function SettingsScreen() {
+  const vsum = useVideoSummary();   // 🎬 1.1.2.5
   const [theme, setTheme] = useState(themePref());
   const [tsize, setTsize] = useState(textLevel());
   const [prefs, setPrefs] = useState(null);
@@ -185,6 +187,9 @@ export function SettingsScreen() {
           onToggle=${(on) => dmAction(() => api.setDmNotify(!on))} />
         <${Row} icon="🚔" color="#EF4444" title="Harita bildirimleri" sub="Radar, kaza, yavaşlama, buzlanma"
           value=${radar.text} valueClass=${radar.muted ? "o" : "g"} onClick=${() => setPage("radar")} />
+        <${Row} icon="🎬" color="#E11D48" title="Video bildirimleri" sub="Yeni eğitici video eklenince haber ver"
+          checked=${vsum ? vsum.notify !== false : true}
+          onToggle=${(on) => api.setVideoNotify(on).then(refreshVideos).catch((e) => toast(userMessage(e), 3500))} />
       </div>
       <div class="set-foot">DYB iPhone ${APP_VERSION} • Ayarlar hesabına kaydedilir. Haritadaki bip sesi bu ayarlardan etkilenmez.</div>`;
   }

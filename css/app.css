@@ -714,3 +714,51 @@ textarea.input { resize: none; }
 .vb-keep { font-size: 11px; opacity: .6; margin-top: 3px; }
 .vb-expired { font-size: 15px; opacity: .75; }
 .vb-report { margin-top: 6px; background: var(--card-2); border-radius: 10px; padding: 10px; }
+
+/* ---------- 1.1.2.5: 🎬 Eğitici Videolar ---------- */
+.video-hero { display: flex; align-items: center; gap: 14px; margin: 12px 16px 0; padding: 14px; width: calc(100% - 32px);
+  border: 0; border-radius: 24px; background: linear-gradient(135deg, #E11D48, #9F1239); color: #fff; font: inherit;
+  text-align: left; cursor: pointer; box-shadow: 0 8px 20px rgba(225, 29, 72, .28); }
+.vh-th { width: 84px; height: 56px; flex: none; border-radius: 14px; background: rgba(255,255,255,.18) center / cover no-repeat;
+  display: flex; align-items: center; justify-content: center; }
+.vh-th i { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.55); font-style: normal; font-size: 12px;
+  display: flex; align-items: center; justify-content: center; }
+.vh-t { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 800; }
+.vh-new { background: #fff; color: #9F1239; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 7px; }
+.vh-d { display: block; font-size: 13px; font-weight: 600; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.vfeed-screen { position: fixed; inset: 0; background: #000; color: #fff; z-index: 40; }
+.vf-top { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 10px;
+  padding: calc(var(--safe-top, env(safe-area-inset-top)) + 8px) 12px 18px; font-size: 19px;
+  background: linear-gradient(rgba(0,0,0,.65), transparent); pointer-events: none; }
+.vf-top > * { pointer-events: auto; }
+.vf-back { background: none; border: 0; color: #fff; font-size: 26px; font-weight: 800; padding: 4px 8px; cursor: pointer; }
+.vf-add { width: 42px; height: 42px; border-radius: 50%; border: 0; background: #E11D48; color: #fff; font-size: 22px; font-weight: 800; cursor: pointer; }
+.vf-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 24px; }
+.vf-center .muted { color: rgba(255,255,255,.7); }
+.vfeed { position: absolute; inset: 0; overflow-y: auto; scroll-snap-type: y mandatory; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.vitem { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; background: #000; }
+.vplayer { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); aspect-ratio: 16 / 9; }
+.vplayer.short { top: 0; bottom: 0; transform: none; aspect-ratio: auto; }
+.vthumb { width: 100%; height: 100%; background: #000 center / contain no-repeat; }
+.vplayer.short .vthumb { background-size: cover; }
+.yt-wrap, .yt-box, .yt-box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.yt-unmute { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 2; border: 0; border-radius: 999px;
+  background: rgba(0,0,0,.7); color: #fff; font: inherit; font-weight: 700; padding: 8px 14px; cursor: pointer; }
+.vside { position: absolute; right: 10px; bottom: 150px; z-index: 2; display: flex; flex-direction: column; gap: 18px; align-items: center; }
+.vbtn { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: 0; color: #fff; font: inherit; cursor: pointer; }
+.vbtn span { width: 50px; height: 50px; border-radius: 50%; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.vbtn.on span { background: #E11D48; }
+.vbtn small { font-size: 12px; font-weight: 700; }
+.vinfo { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 30px 80px calc(env(safe-area-inset-bottom) + 18px) 16px;
+  background: linear-gradient(transparent, rgba(0,0,0,.78)); display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.vinfo b { font-size: 17px; }
+.vinfo span { font-size: 13px; opacity: .8; }
+.vfail { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 80%; text-align: center;
+  background: rgba(0,0,0,.8); border-radius: 16px; padding: 18px; }
+.vadd-prev { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; margin-top: 10px; }
+.ved-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: rgba(225,29,72,.12); cursor: pointer; }
+.ved-row .switch { pointer-events: none; }
+.v-bad { color: #EF4444; }
+.v-ok { color: #16A34A; }
+.vplayer.short .yt-unmute { top: calc(env(safe-area-inset-top) + 74px); }
