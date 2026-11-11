@@ -86,6 +86,9 @@ const SAFE_PREFIXES = [
   "Açıklama en fazla", "Hakkımda", "Kurucunun şifresi", "Şifre şu an", "Şifre değiştirilemedi",
   "Oturumun sona erdi", "Güncelleme dosyası", "Bir mesajda en fazla", "Mesaj sadece", "Mesaj en fazla",
   "Geçersiz tepki",
+  // 1.1.2.7: video kategorileri
+  "Kategori", "Bu adda bir kategori", "Simge çok uzun", "Geçersiz renk", "\"Genel\" kategorisi", "Video başlığı", "Geçersiz YouTube",
+  "Bu video zaten", "Bir saatte en fazla", "Video en fazla", "Video bulunamadı",
 ];
 
 export function userMessage(err, fallback = "İşlem şu an tamamlanamadı. Lütfen tekrar dene.") {

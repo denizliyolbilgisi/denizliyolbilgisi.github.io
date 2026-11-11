@@ -18,8 +18,9 @@ import { MapScreen } from "./screens/map.js";
 import { InvitesScreen } from "./screens/invites.js";
 import { SettingsScreen } from "./screens/settings.js";
 import { WallpaperScreen } from "./screens/wallpaper.js";
-import { VideosScreen } from "./screens/videos.js";
+import { VideosScreen, VideoCategoriesScreen, VideoCategoryManageScreen } from "./screens/videos.js";
 import { AdminScreen } from "./screens/admin.js";
+import { OkeyScreen } from "./screens/okey.js";
 
 // Arka plan görevlisi (bildirim ve çevrimdışı açılış)
 if ("serviceWorker" in navigator) {
@@ -205,7 +206,15 @@ function App() {
   } else if (path === "/ayarlar") {
     screen = html`<${SettingsScreen} />`;
   } else if (path === "/videolar") {
-    screen = html`<${VideosScreen} />`;
+    // 1.1.2.7: ?k=<kategori> ya da ?k=tum → akış; yoksa kategori ekranı
+    const k = query.get("k");
+    screen = k
+      ? html`<${VideosScreen} key=${k} kategori=${k === "tum" ? null : parseInt(k, 10) || null} openAdd=${query.get("ekle") === "1"} />`
+      : html`<${VideoCategoriesScreen} />`;
+  } else if (path === "/videolar/yonet") {
+    screen = html`<${VideoCategoryManageScreen} />`;
+  } else if (path === "/okey") {
+    screen = html`<${OkeyScreen} />`;
   } else if (path === "/duvar") {
     screen = html`<${WallpaperScreen} />`;
   } else if (path === "/yonetim") {

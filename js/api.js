@@ -8,6 +8,8 @@ function check({ data, error }) {
   return data;
 }
 const rpc = async (name, args = {}) => check(await sb.rpc(name, args));
+/** 1.1.2.7: başka modüllerin (Okey) kullandığı genel çağrı */
+export const rpcCall = rpc;
 
 // ---------------------------------------------------------------------------
 // Oturum
@@ -656,9 +658,18 @@ export function cleanInviteCode(raw) {
 // 1.1.2.5: 🎬 Eğitici Videolar (YouTube'da durur, uygulamada YouTube oynatıcısıyla gösterilir)
 // ---------------------------------------------------------------------------
 export const videosSummary = () => rpc("videos_summary");
-export const videosFeed = (before) => rpc("videos_feed", { p_before: before ?? null, p_limit: 20 });
-export const videoAdd = (url, title, duration, isShort) =>
-  rpc("video_add", { p_url: url, p_title: title, p_duration: duration || null, p_is_short: !!isShort });
+export const videosFeed = (before, kategori = null) =>
+  rpc("videos_feed", { p_before: before ?? null, p_limit: 20, p_kategori: kategori ?? null });
+export const videoAdd = (url, title, duration, isShort, kategori = null) =>
+  rpc("video_add", { p_url: url, p_title: title, p_duration: duration || null, p_is_short: !!isShort, p_kategori: kategori ?? null });
+// 1.1.2.7: video kategorileri
+export const videoCategories = async () => (await rpc("video_categories")) || [];
+export const videoSetCategory = (id, kategori) => rpc("video_set_category", { p_id: id, p_kategori: kategori });
+export const videoCategorySave = (id, ad, ikon, renk, aktif = true) =>
+  rpc("video_category_save", { p_id: id ?? null, p_ad: ad, p_ikon: ikon, p_renk: renk, p_aktif: aktif });
+export const videoCategoryToggle = (id, aktif) => rpc("video_category_toggle", { p_id: id, p_aktif: aktif });
+export const videoCategoryMove = (id, yon) => rpc("video_category_move", { p_id: id, p_yon: yon });
+export const videoCategoryDelete = (id) => rpc("video_category_delete", { p_id: id });
 export const videoDelete = (id) => rpc("video_delete", { p_id: id });
 export const videoLike = (id) => rpc("video_like", { p_id: id });
 export const videoView = (id) => rpc("video_view", { p_id: id }).catch(() => null);

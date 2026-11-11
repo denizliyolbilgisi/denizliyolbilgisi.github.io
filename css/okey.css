@@ -1,0 +1,189 @@
+/* 1.1.2.7 🎴 Okey — salon ve masa (iPhone ve Android ortak) */
+.okey-kok { position: fixed; inset: 0; z-index: 50; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #FFFFFF; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.okey-kok button { font-family: inherit; cursor: pointer; }
+.okey-kok button:disabled { cursor: default; }
+.ok-sayi, .ok-tas .n, .ok-ist b, .ok-okey .v, .ok-pp, .ok-psira { font-family: Rubik, "Arial Rounded MT Bold", Inter, system-ui, sans-serif; }
+
+/* ---------- Taş ---------- */
+.ok-tas { position: relative; width: 40px; height: 50px; flex-shrink: 0; box-sizing: border-box; border-radius: 6px;
+  background: linear-gradient(180deg, #FFFDF6, #EFE7D3); box-shadow: 0 2px 0 #CFC4A8, 0 3px 6px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; touch-action: none;
+  transition: transform .12s ease, box-shadow .12s ease; }
+.ok-tas .n { font-weight: 800; font-size: 22px; line-height: 1; }
+.ok-tas .d { width: 6px; height: 6px; border-radius: 50%; }
+.ok-tas .ok-yildiz { width: 24px; height: 24px; }
+.ok-tas .ok-rozet { position: absolute; bottom: 1px; left: 0; right: 0; text-align: center; font-size: 7px; font-weight: 800; color: #B45309; letter-spacing: .3px; }
+.ok-tas.okey .d { display: none; }
+.ok-tas.bos { background: rgba(0,0,0,0.18); box-shadow: inset 0 2px 4px rgba(0,0,0,0.35); }
+.ok-tas.bos.davet { box-shadow: inset 0 2px 4px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.18); }
+.ok-tas.sec { transform: translateY(-8px); box-shadow: 0 2px 0 #CFC4A8, 0 8px 14px rgba(0,0,0,0.45), 0 0 0 2px #3D8BFF; }
+.ok-tas.yeni:not(.sec) { box-shadow: 0 2px 0 #CFC4A8, 0 3px 6px rgba(0,0,0,0.35), 0 0 0 2px #FACC15; }
+.ok-tas.kayan { opacity: .35; }
+.ok-tas.hedef { box-shadow: 0 0 0 2px #4ADE80, inset 0 2px 4px rgba(0,0,0,0.35); }
+.ok-tas.hayalet { position: absolute; z-index: 40; pointer-events: none; transform: scale(1.08) rotate(-3deg);
+  box-shadow: 0 2px 0 #CFC4A8, 0 12px 22px rgba(0,0,0,0.5), 0 0 0 2px #3D8BFF; transition: none; }
+.ok-tas.sm { width: 32px; height: 40px; border-radius: 5px; }
+.ok-tas.sm .n { font-size: 17px; }
+.ok-tas.sm .d { width: 5px; height: 5px; }
+.ok-tas.sm .ok-yildiz { width: 19px; height: 19px; }
+.ok-tas.xs { width: 30px; height: 40px; border-radius: 5px; box-shadow: 0 2px 0 #CFC4A8; }
+.ok-tas.xs .n { font-size: 17px; }
+.ok-tas.xs .d { width: 4px; height: 4px; }
+.ok-tas.xs .ok-yildiz { width: 18px; height: 18px; }
+.ok-tas.gosterge { box-shadow: 0 2px 0 #CFC4A8, 0 3px 6px rgba(0,0,0,0.35), 0 0 0 2px #FACC15; }
+.ok-tas.gosterge.hedef { box-shadow: 0 0 0 3px #4ADE80, 0 0 18px rgba(74,222,128,.6); }
+
+/* ---------- Avatar ---------- */
+.ok-av { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; flex-shrink: 0; }
+.ok-av.bosav { width: 44px; height: 44px; font-size: 20px; background: transparent; border: 1.5px dashed #4B5B70; opacity: .7; }
+.ok-halka { position: relative; flex-shrink: 0; }
+.ok-halka svg { position: absolute; inset: 0; }
+.ok-halka .ok-av { width: 100% !important; height: 100% !important; }
+
+/* ---------- Salon ---------- */
+.ok-salon { position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #0F2A1F 0%, #0E1621 46%); padding: env(safe-area-inset-top) max(0px, env(safe-area-inset-right)) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box; }
+.ok-salon > * { width: 100%; max-width: 560px; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
+.ok-sbas { display: flex; align-items: center; gap: 12px; padding: 18px 16px 6px; }
+.ok-geri { width: 40px; height: 40px; border: 0; border-radius: 12px; background: #1F6FEB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ok-sbaslik { font-size: 21px; font-weight: 800; }
+.ok-salt { font-size: 13px; color: #A7B8C9; font-weight: 600; }
+.ok-hizli { margin: 12px 16px 0; width: calc(100% - 32px) !important; max-width: 528px !important; border: 0; border-radius: 20px; padding: 16px; color: #fff;
+  background: linear-gradient(135deg, #14533A, #0E3B29); box-shadow: 0 8px 20px rgba(0,0,0,0.35); display: flex; align-items: center; gap: 14px; }
+.ok-hizli-t { display: flex; gap: 4px; }
+.ok-hizli-t .ok-tas { width: 34px; height: 44px; }
+.ok-hb { font-size: 17px; font-weight: 800; }
+.ok-hd { font-size: 13px; color: #CDE3D6; font-weight: 600; }
+.ok-oynat { width: 44px; height: 44px; border-radius: 14px; background: #22C55E; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 #15803D; flex-shrink: 0; }
+.ok-ist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 0; }
+.ok-ist > div { background: #172231; border-radius: 14px; padding: 10px; text-align: center; }
+.ok-ist b { display: block; font-size: 20px; font-weight: 800; }
+.ok-ist span { font-size: 12px; color: #A7B8C9; font-weight: 600; }
+.ok-bolum { font-size: 13px; font-weight: 800; color: #A7B8C9; letter-spacing: .6px; padding: 20px 20px 8px; }
+.ok-masalar { display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
+.ok-bos { color: #A7B8C9; text-align: center; padding: 22px 10px; font-size: 15px; background: #172231; border-radius: 18px; }
+.ok-mkart { background: #172231; border: 1px solid #243246; border-radius: 18px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+.ok-mad { font-size: 16px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.ok-etiket { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; }
+.ok-koltuklar { display: flex; gap: 4px; margin-top: 8px; }
+.ok-kc { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.ok-kc.bos { background: transparent; border: 1.5px dashed #4B5B70; color: #7B8BA0; box-sizing: border-box; }
+.ok-mbtn { min-width: 76px; height: 40px; border: 0; border-radius: 12px; color: #fff; font-size: 14px; font-weight: 800; flex-shrink: 0; }
+.ok-alt { display: flex; gap: 10px; padding: 14px 16px 0; }
+.ok-masaac { flex: 1; height: 46px; border: 1px dashed #3D8BFF; border-radius: 14px; background: transparent; color: #9FC5FF; font-size: 15px; font-weight: 800; }
+.ok-yenile { flex: 1; height: 46px; border: 0; border-radius: 14px; background: #1F6FEB; color: #fff; font-size: 15px; font-weight: 800; }
+.ok-not { margin: 18px 16px 22px; border-radius: 14px; padding: 10px 12px; background: rgba(250,204,21,0.10); border: 1px solid rgba(250,204,21,0.35);
+  color: #FDE68A; font-size: 13px; font-weight: 600; line-height: 1.35; width: calc(100% - 32px) !important; max-width: 528px !important; }
+
+/* ---------- Masa ---------- */
+.ok-masa-dis { position: absolute; inset: 0; overflow: hidden; touch-action: none; box-sizing: border-box;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: radial-gradient(ellipse at 50% 42%, #2D6D54 0%, #14533A 62%, #0A2A1E 100%); }
+.ok-yukleniyor { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #D7E8DF; font-weight: 700; font-size: 16px; text-align: center; padding: 20px; }
+.ok-sahne { position: absolute; left: 50%; top: 50%; width: 844px; height: 390px; margin: -195px 0 0 -422px; transform-origin: 50% 50%; overflow: visible; }
+.ok-desen { position: absolute; inset: -400px; background: repeating-linear-gradient(45deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 2px, transparent 2px, transparent 6px); pointer-events: none; }
+.ok-cubuk { position: absolute; left: 0; top: 0; right: 0; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box; background: rgba(6,20,14,0.55); border-radius: 0 0 12px 12px; }
+.ok-cgeri { width: 30px; height: 30px; border: 0; border-radius: 9px; background: #1F6FEB; display: flex; align-items: center; justify-content: center; }
+.ok-logo { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #3D8BFF, #1E5FD1); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 900; }
+.ok-cad { font-size: 15px; font-weight: 800; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ok-cel { font-size: 12px; font-weight: 600; color: #B9D3C6; }
+.ok-cevrim { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #B9D3C6; }
+.ok-cevrim span { display: inline-flex; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; }
+.ok-ckalk { height: 30px; padding: 0 12px; border: 0; border-radius: 9px; background: rgba(255,255,255,0.12); color: #fff; font-size: 13px; font-weight: 700; }
+.ok-ckalk.yesil { background: #16A34A; }
+
+.ok-ust { position: absolute; left: 50%; top: 48px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; }
+.ok-ustk { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.28); border-radius: 999px; padding: 4px 12px 4px 4px; white-space: nowrap; }
+.ok-ustk.sirada { background: rgba(250,204,21,0.18); }
+.ok-ustatilan { transform: rotate(3deg); }
+.ok-sol, .ok-sag { position: absolute; top: 96px; width: 104px; }
+.ok-sol { left: 8px; } .ok-sag { right: 8px; }
+.ok-oyuncu { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.ok-oyuncu.bos-k { color: #B9D3C6; font-size: 12px; padding-top: 20px; }
+.ok-oad { font-size: 13px; font-weight: 700; max-width: 104px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ok-oalt { font-size: 11px; color: #B9D3C6; font-weight: 600; white-space: nowrap; }
+.ok-orozet { font-size: 10px; font-weight: 800; color: #FDE68A; background: rgba(0,0,0,0.3); border-radius: 999px; padding: 1px 7px; }
+
+.ok-yer { position: absolute; border: 0; background: transparent; padding: 0; }
+.ok-solyer { left: 120px; top: 150px; display: flex; flex-direction: column; align-items: center; gap: 4px; border-radius: 10px; }
+.ok-solyer.aktif .ok-tas { box-shadow: 0 2px 0 #CFC4A8, 0 3px 6px rgba(0,0,0,0.35), 0 0 0 2px #4ADE80; animation: ok-nabiz 1.2s infinite; }
+.ok-yerbos { width: 40px; height: 50px; border-radius: 6px; border: 1.5px dashed rgba(255,255,255,0.22); box-sizing: border-box; }
+.ok-al { font-size: 11px; font-weight: 800; color: #86EFAC; }
+.ok-sagyer { position: absolute; right: 124px; top: 154px; }
+@keyframes ok-nabiz { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+.ok-orta { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 22px; }
+.ok-deste { border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #fff; }
+.ok-dst { position: relative; width: 48px; height: 66px; }
+.ok-dst > div { position: absolute; width: 40px; height: 50px; border-radius: 6px; box-shadow: 0 2px 0 #0E3A85; }
+.ok-dst > .ust { box-shadow: 0 2px 0 #0E3A85, 0 4px 8px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; letter-spacing: 1px; color: rgba(255,255,255,0.85); }
+.ok-deste.aktif .ust { box-shadow: 0 2px 0 #0E3A85, 0 0 0 2px #4ADE80, 0 0 14px rgba(74,222,128,.55); animation: ok-nabiz 1.2s infinite; }
+.ok-gst { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ok-etk { font-size: 11px; font-weight: 700; color: #D7E8DF; white-space: nowrap; }
+.ok-okey { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 6px 10px; text-align: center; margin-bottom: 18px; }
+.ok-okey .k { font-size: 10px; font-weight: 700; color: #B9D3C6; letter-spacing: .5px; }
+.ok-okey .v { font-size: 18px; font-weight: 800; white-space: nowrap; }
+
+.ok-durum { position: absolute; left: 50%; top: 208px; transform: translateX(-50%); background: rgba(250,204,21,0.16); border: 1px solid rgba(250,204,21,0.55);
+  color: #FDE68A; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ok-durum.soluk { background: rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.15); color: #D7E8DF; }
+.ok-durum.hazir { background: rgba(34,197,94,0.22); border-color: #4ADE80; color: #BBF7D0; }
+.ok-olay { position: absolute; left: 50%; top: 234px; transform: translateX(-50%); font-size: 11px; color: #B9D3C6; font-weight: 600; white-space: nowrap; max-width: 560px; overflow: hidden; text-overflow: ellipsis; }
+.ok-oto { position: absolute; left: 50%; top: 172px; transform: translateX(-50%); z-index: 5; background: #7C2D12; border: 1px solid #FB923C; border-radius: 12px; padding: 6px 8px 6px 12px;
+  font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.ok-oto button { border: 0; border-radius: 8px; background: #FB923C; color: #1C0A02; font-weight: 800; font-size: 12px; padding: 5px 10px; }
+
+.ok-ben { position: absolute; left: 10px; bottom: 22px; width: 104px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.ok-istaka { position: absolute; left: 124px; bottom: 8px; width: 596px; height: 124px; box-sizing: border-box; border-radius: 12px; padding: 9px 12px;
+  background: linear-gradient(180deg, #9C6C44 0%, #7A4A22 55%, #4A2C14 100%); box-shadow: 0 6px 16px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
+  display: flex; flex-direction: column; gap: 6px; }
+.ok-sira { display: flex; gap: 4px; height: 50px; }
+.ok-izleyici { position: absolute; left: 124px; bottom: 8px; width: 596px; height: 60px; border-radius: 12px; background: rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #D7E8DF; }
+.ok-atalan { position: absolute; right: 38px; top: 190px; width: 40px; height: 50px; border-radius: 6px; border: 1.5px dashed rgba(255,255,255,0.28); box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.55); }
+.ok-atalan .ok-tas { margin: -1.5px; }
+.ok-atalan.aktif { border-color: #FACC15; color: #FDE68A; background: rgba(250,204,21,0.10); animation: ok-nabiz 1.2s infinite; }
+.ok-atalan.hedef { border-color: #4ADE80; background: rgba(74,222,128,0.22); }
+.ok-dugmeler { position: absolute; right: 14px; bottom: 14px; width: 98px; display: flex; flex-direction: column; gap: 8px; }
+.ok-dugmeler button { height: 36px; border: 0; border-radius: 10px; background: rgba(255,255,255,0.14); color: #fff; font-size: 13px; font-weight: 700; }
+.ok-dugmeler button.bitir { height: 40px; background: #16A34A; font-size: 14px; font-weight: 800; box-shadow: 0 3px 0 #0F7A37; }
+.ok-dugmeler button.parla { box-shadow: 0 3px 0 #0F7A37, 0 0 0 2px #BBF7D0, 0 0 16px rgba(74,222,128,.7); }
+.ok-sonuc { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); border: 0; border-radius: 12px; background: #FACC15; color: #1C1917; font-weight: 800; font-size: 14px; padding: 10px 18px; z-index: 6; }
+
+/* ---------- Kaplamalar ---------- */
+.ok-kaplama { position: absolute; inset: 0; z-index: 20; background: rgba(4,14,10,0.55); display: flex; align-items: center; justify-content: center; }
+.ok-kutu { width: 520px; border-radius: 22px; background: #111C27; border: 1px solid #243246; box-shadow: 0 20px 50px rgba(0,0,0,0.5); padding: 18px 22px; box-sizing: border-box; }
+.ok-kbas { font-size: 20px; font-weight: 800; }
+.ok-kalt { font-size: 13px; color: #A7B8C9; font-weight: 600; margin-top: 4px; }
+.ok-bkolt { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0 6px; }
+.ok-bk { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ok-bekle { color: #FDE68A; font-weight: 700; font-size: 14px; align-self: center; }
+.ok-bitti { width: 760px; border-radius: 22px; background: #111C27; border: 1px solid #243246; box-shadow: 0 20px 50px rgba(0,0,0,0.5); padding: 16px 20px; box-sizing: border-box; display: flex; gap: 20px; }
+.ok-bbas { font-size: 20px; font-weight: 800; }
+.ok-btur { font-size: 13px; color: #FDE68A; font-weight: 700; }
+.ok-bolum2 { font-size: 12px; font-weight: 800; color: #A7B8C9; letter-spacing: .6px; }
+.ok-gruplar { display: flex; flex-wrap: wrap; gap: 8px; }
+.ok-grup { display: flex; gap: 3px; padding: 5px; border-radius: 9px; background: rgba(255,255,255,0.06); }
+.ok-puanlar { width: 210px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.ok-psatir { display: flex; align-items: center; gap: 8px; border-radius: 12px; padding: 6px 8px; background: #172231; }
+.ok-psira { width: 16px; font-weight: 800; font-size: 14px; color: #A7B8C9; }
+.ok-pad { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ok-pp { font-size: 15px; font-weight: 800; color: #4ADE80; }
+.ok-pnot { font-size: 11px; color: #8796A8; line-height: 1.35; margin-top: 2px; }
+
+.ok-kbtn { height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: #1F6FEB; color: #fff; font-size: 15px; font-weight: 800; }
+.ok-kbtn.gri { background: #243246; font-weight: 700; }
+.ok-kbtn.yesil { background: #16A34A; box-shadow: 0 3px 0 #0F7A37; }
+.ok-kbtn.kirmizi { background: #DC2626; }
+.ok-kbtn.buyuk { padding: 0 22px; }
+.ok-perde { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; }
+.ok-pencere { width: 420px; border-radius: 20px; background: #111C27; border: 1px solid #243246; padding: 18px 20px; box-sizing: border-box; }
+.ok-pencere h3 { margin: 0 0 8px; font-size: 18px; }
+.ok-pencere p { margin: 0; color: #C7D2DE; font-size: 14px; line-height: 1.4; }
+.ok-pbtn { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; flex-wrap: wrap; }
+.ok-toast { position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); z-index: 45; background: rgba(15,23,42,0.95); border: 1px solid #334155;
+  color: #fff; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 700; max-width: 80%; text-align: center; pointer-events: none; }
+.ok-salon .ok-toast { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); font-size: 15px; }

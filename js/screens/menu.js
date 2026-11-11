@@ -8,6 +8,7 @@ import { RankUpModal } from "./profile.js";
 import { WallLayer, useWall, NONE, refresh as refreshWall } from "../wall.js";
 import { refreshVoiceSettings } from "./voice.js";
 import { VideoHomeCard, refreshVideos } from "./videos.js";
+import { OkeyHomeCard } from "./okey.js";
 
 const ROOM_COLORS = {
   trafik: ["#FFB020", "#E07B00"],
@@ -258,6 +259,7 @@ export function MenuScreen({ onBanned }) {
       </div>
 
       <${VideoHomeCard} />
+      <${OkeyHomeCard} />
 
       ${muted && html`
         <div class="card" style="margin:14px 16px 0;background:var(--red-box);border-color:#FF6B6B">
