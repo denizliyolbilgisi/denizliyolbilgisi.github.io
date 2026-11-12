@@ -5,6 +5,7 @@ import {
   RENK, renk, sayi, deger, tasAdi, YER, SATIR, esitle, tasi, yerlestir, seriGruplari, ciftGruplari,
   bitirebilir, gruplara, gercekOkey,
 } from "./kural.js";
+import { cal, sesAcikMi, sesAyarla } from "./ses.js";
 
 const W = 844, H = 390;
 const AV = ["#2563EB", "#7C3AED", "#0D9488", "#DB2777", "#EA580C", "#16A34A", "#0891B2", "#B45309"];
@@ -328,6 +329,9 @@ function Masa({ rpc, masaId, onLobi }) {
   const [toast, goster] = useToast();
   const dRef = useRef(null);
   const sayac = useRef(0);
+  const [sesOn, setSesOn] = useState(sesAcikMi());
+  const sonSes = useRef(null);      // önceki durum (sesler için)
+  const sonTik = useRef(null);
   const dis = useRef(null), sahne = useRef(null);
   const fit = useSigdir(dis, !!d);
   const istek = useRef(false);
@@ -406,6 +410,35 @@ function Masa({ rpc, masaId, onLobi }) {
     } catch (_) { /* */ }
   }, [d?.el && d.el.join(","), d?.el_no]);
 
+  // 🔊 Olay sesleri: önceki durumla karşılaştır (kendi hamlelerimin sesi hamle() içinde çalar)
+  useEffect(() => {
+    if (!d || d.ayni) return;
+    const o = sonSes.current;
+    sonSes.current = d;
+    if (!o || o.id !== d.id) return;
+    const ben = d.benim_koltuk;
+    if (d.durum === "oynaniyor" && (o.durum !== "oynaniyor" || d.el_no !== o.el_no)) { cal("karis"); return; }
+    if (d.durum === "bitti" && o.durum === "oynaniyor") {
+      if (d.kazanan != null && d.kazanan === ben) cal(d.bitis_turu === "normal" ? "kazan" : "okey");
+      else cal("bitti");
+      return;
+    }
+    if (d.durum !== "oynaniyor") return;
+    // başkasının attığı taş (kısık)
+    (d.koltuklar || []).forEach((k) => {
+      const ok = (o.koltuklar || []).find((x) => x.koltuk === k.koltuk);
+      if (ok && k.koltuk !== ben && k.atilan_sayi > ok.atilan_sayi) cal("at", 0.45);
+    });
+    if (ben != null && d.sira === ben && o.sira !== ben) setTimeout(() => cal("sira", 0.8), 250);
+  }, [d?.surum, d?.durum, d?.el_no]);
+  // ⏱ son 5 saniye (sadece benim sıramda)
+  {
+    const sn = d && d.durum === "oynaniyor" && d.benim_koltuk != null && d.sira === d.benim_koltuk && d.kalan_sn != null
+      ? Math.ceil(Math.max(0, d.kalan_sn - (Date.now() - alinma) / 1000)) : null;
+    if (sn != null && sn >= 1 && sn <= 5 && sonTik.current !== sn) { sonTik.current = sn; cal("sure", 0.5); }
+    if (sn == null || sn > 5) sonTik.current = null;
+  }
+
   // Sıra bana geçince titreşim
   useEffect(() => {
     if (!d) return;
@@ -422,10 +455,11 @@ function Masa({ rpc, masaId, onLobi }) {
     setMesgul(true);
     try {
       await rpc("okey_hamle", { p_masa: masaId, p_hamle: h, p_tas: tas });
+      if (h === "cek_deste" || h === "cek_yer") cal("cek"); else if (h === "at") cal("at");
       setSecili(null);
       istek.current = false;
       await getir(true);
-    } catch (e) { goster(hataMetni(e), 3800); }
+    } catch (e) { cal("hata", 0.6); goster(hataMetni(e), 3800); }
     setMesgul(false);
   }
   async function cagir(ad, arg, sonra) {
@@ -503,7 +537,7 @@ function Masa({ rpc, masaId, onLobi }) {
   function birak(yer, h) {
     if (!h) return;
     const t = dizi[yer];
-    if (h.startsWith("yer:")) { kaydet(tasi(dizi, yer, parseInt(h.slice(4), 10))); setSecili(null); }
+    if (h.startsWith("yer:")) { kaydet(tasi(dizi, yer, parseInt(h.slice(4), 10))); setSecili(null); cal("diz", 0.6); }
     else if (h === "at") { if (atAsama) hamle("at", t); else goster(sirabende ? "Önce taş çekmelisin." : "Sıra sende değil."); }
     else if (h === "bitir") { if (atAsama) hamle("bitir", t); else goster(sirabende ? "Bitirmek için önce taş çek." : "Sıra sende değil."); }
   }
@@ -512,7 +546,7 @@ function Masa({ rpc, masaId, onLobi }) {
     setSecili(yer);
   }
   function yerDokun(yer) {
-    if (secili != null && dizi[yer] == null) { kaydet(tasi(dizi, secili, yer)); setSecili(null); }
+    if (secili != null && dizi[yer] == null) { kaydet(tasi(dizi, secili, yer)); setSecili(null); cal("diz", 0.6); }
   }
   function atDokun() {
     if (!atAsama) { goster(cekAsama ? "Önce desteden ya da soldan taş çek." : "Sıra sende değil."); return; }
@@ -570,6 +604,7 @@ function Masa({ rpc, masaId, onLobi }) {
           ${d.el_no > 0 && html`<div class="ok-cel">El ${d.el_no}</div>`}
           <div style="flex:1"></div>
           <div class="ok-cevrim"><span></span>${cevrim} oyuncu çevrimiçi</div>
+          <button class="ok-cses" aria-label=${sesOn ? "Sesi kapat" : "Sesi aç"} onClick=${() => { const y = !sesOn; setSesOn(y); sesAyarla(y); }}>${sesOn ? "🔊" : "🔇"}</button>
           <button class="ok-csohbet" aria-label="Masa sohbeti" onClick=${() => { setSohbetAcik(!sohbetAcik); setOkunan(sonMsj); }}>
             💬${okunmamis > 0 && html`<i>${okunmamis}</i>`}
           </button>
