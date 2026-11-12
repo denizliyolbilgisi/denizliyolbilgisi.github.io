@@ -6,12 +6,17 @@ import {
   bitirebilir, gruplara, gercekOkey,
 } from "./kural.js";
 import { cal, sesAcikMi, sesAyarla } from "./ses.js";
+import { PistiSalon, PistiMasa } from "./pisti.js";
+import { BilgiEkrani } from "./bilgi.js";
+import { KelimeEkrani } from "./kelime.js";
+
+const SEKMELER = [["okey", "🎴", "Okey"], ["pisti", "🃏", "Pişti"], ["bilgi", "🚦", "Yarışma"], ["kelime", "🔤", "Kelime"]];
 
 const W = 844, H = 390;
 const AV = ["#2563EB", "#7C3AED", "#0D9488", "#DB2777", "#EA580C", "#16A34A", "#0891B2", "#B45309"];
-const avRenk = (ad) => { let h = 0; for (const ch of ad || "") h = (h * 31 + ch.charCodeAt(0)) >>> 0; return AV[h % AV.length]; };
-const harf = (ad) => (ad || "?").replace(/^@/, "").replace(/^🤖\s*/, "").charAt(0).toUpperCase() || "?";
-const ls = {
+export const avRenk = (ad) => { let h = 0; for (const ch of ad || "") h = (h * 31 + ch.charCodeAt(0)) >>> 0; return AV[h % AV.length]; };
+export const harf = (ad) => (ad || "?").replace(/^@/, "").replace(/^🤖\s*/, "").charAt(0).toUpperCase() || "?";
+export const ls = {
   get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* */ } },
   del(k) { try { localStorage.removeItem(k); } catch (_) { /* */ } },
@@ -48,7 +53,7 @@ function Tas({ t, okR, okN, cls = "", style = "", ...rest }) {
     ${ok && html`<span class="ok-rozet">OKEY</span>`}
   </div>`;
 }
-function Avatar({ ad, bot, size = 38, halka = null }) {
+export function Avatar({ ad, bot, size = 38, halka = null }) {
   const st = `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.4)}px;background:${bot ? "#475569" : avRenk(ad)}`;
   const a = html`<div class="ok-av" style=${st}>${bot ? "🤖" : harf(ad)}</div>`;
   if (halka == null) return a;
@@ -62,7 +67,7 @@ function Avatar({ ad, bot, size = 38, halka = null }) {
     <div style="position:absolute;inset:7px">${a}</div>
   </div>`;
 }
-function Pencere({ baslik, children, onClose, butonlar }) {
+export function Pencere({ baslik, children, onClose, butonlar }) {
   return html`<div class="ok-perde" onClick=${(e) => { if (e.target === e.currentTarget && onClose) onClose(); }}>
     <div class="ok-pencere">
       ${baslik && html`<h3>${baslik}</h3>`}
@@ -71,11 +76,11 @@ function Pencere({ baslik, children, onClose, butonlar }) {
     </div>
   </div>`;
 }
-function Bildirim({ metin }) {
+export function Bildirim({ metin }) {
   if (!metin) return null;
   return html`<div class="ok-toast" role="status">${metin}</div>`;
 }
-function useToast() {
+export function useToast() {
   const [m, setM] = useState(null);
   const t = useRef(0);
   const goster = (x, ms = 2600) => { setM(x); clearTimeout(t.current); t.current = setTimeout(() => setM(null), ms); };
@@ -87,16 +92,22 @@ function useToast() {
 // ---------------------------------------------------------------------------
 export function OkeyApp({ rpc, onExit, setOrientation }) {
   const [masa, setMasa] = useState(() => ls.get("okey_acik_masa", null));
+  const [pMasa, setPMasa] = useState(() => ls.get("pisti_acik_masa", null));     // 2.0: Pişti masası
+  const [sekme, setSekmeS] = useState(() => ls.get("oyun_sekme", "okey"));
+  const setSekme = (x) => { setSekmeS(x); ls.set("oyun_sekme", x); };
   useEffect(() => { if (masa) ls.set("okey_acik_masa", masa); else ls.del("okey_acik_masa"); }, [masa]);
-  useEffect(() => { setOrientation?.(masa ? "landscape" : "portrait"); }, [masa]);
+  useEffect(() => { if (pMasa) ls.set("pisti_acik_masa", pMasa); else ls.del("pisti_acik_masa"); }, [pMasa]);
+  useEffect(() => { setOrientation?.(masa || pMasa ? "landscape" : "portrait"); }, [masa, pMasa]);
   // Android geri tuşu: masadaysa salona dön (true = işlendi)
   useEffect(() => {
-    window.dybBack = () => { if (masa) { setMasa(null); return true; } return false; };
+    window.dybBack = () => { if (masa) { setMasa(null); return true; } if (pMasa) { setPMasa(null); return true; } return false; };
     return () => { window.dybBack = null; };
-  }, [masa]);
+  }, [masa, pMasa]);
   return html`<div class="okey-kok">${masa
     ? html`<${Masa} key=${masa} rpc=${rpc} masaId=${masa} onLobi=${() => setMasa(null)} />`
-    : html`<${Salon} rpc=${rpc} onExit=${onExit} onMasa=${setMasa} />`}</div>`;
+    : pMasa ? html`<${PistiMasa} key=${pMasa} rpc=${rpc} masaId=${pMasa} onLobi=${() => setPMasa(null)} />`
+    : html`<${Salon} rpc=${rpc} onExit=${onExit} onMasa=${setMasa} onPisti=${(id) => { setSekme("pisti"); setPMasa(id); }}
+        sekme=${sekme} setSekme=${setSekme} />`}</div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +158,7 @@ function SalonSohbet({ rpc, salon, onYaz, goster }) {
 // Salon (masa listesi)
 // ---------------------------------------------------------------------------
 let otoGiris = true;   // yeniden bağlanma: sayfa ilk açıldığında bir kez
-function Salon({ rpc, onExit, onMasa }) {
+function Salon({ rpc, onExit, onMasa, onPisti, sekme = "okey", setSekme }) {
   const [liste, setListe] = useState(null);
   const [salon, setSalon] = useState({});        // 1.1: masa_ac, sohbet_acik, sohbet
   const [alinma, setAlinma] = useState(Date.now());
@@ -210,9 +221,17 @@ function Salon({ rpc, onExit, onMasa }) {
         </button>
         <div style="flex:1;min-width:0">
           <div class="ok-sbaslik">Oyun Salonu <span class="ok-beta">BETA</span></div>
-          <div class="ok-salt">${liste ? `🎴 Okey • ${insan} oyuncu • ${liste.length} masa` : "Yükleniyor…"}</div>
+          <div class="ok-salt">Okey • Pişti • Yarışma • Kelime</div>
         </div>
       </div>
+      <div class="ok-sekmeler" role="tablist">
+        ${SEKMELER.map(([k, i, ad]) => html`<button key=${k} role="tab" aria-selected=${sekme === k} class=${sekme === k ? "on" : ""}
+          onClick=${() => setSekme && setSekme(k)}><span>${i}</span>${ad}</button>`)}
+      </div>
+      ${sekme === "pisti" && html`<${PistiSalon} rpc=${rpc} onMasa=${onPisti} />`}
+      ${sekme === "bilgi" && html`<${BilgiEkrani} rpc=${rpc} />`}
+      ${sekme === "kelime" && html`<${KelimeEkrani} rpc=${rpc} />`}
+      ${sekme === "okey" && html`
 
       <button class="ok-hizli" disabled=${mesgul} onClick=${hizli}>
         <div class="ok-hizli-t">
@@ -277,6 +296,7 @@ function Salon({ rpc, onExit, onMasa }) {
       </div>
 
       <${SalonSohbet} rpc=${rpc} salon=${salon} onYaz=${yukle} goster=${goster} />
+      `}
 
       <div style="flex:1"></div>
       <div class="ok-not">🧪 Oyun Salonu deneme (Beta) aşamasındadır. Oyun sadece eğlence içindir; para, çip ya da DYB puanı yoktur. Araç kullanırken oynama.</div>
@@ -287,7 +307,7 @@ function Salon({ rpc, onExit, onMasa }) {
 // ---------------------------------------------------------------------------
 // Ekrana sığdırma: masa 844×390 tasarlandı; telefon dikse 90° döndürülür
 // ---------------------------------------------------------------------------
-function useSigdir(dis, dep) {
+export function useSigdir(dis, dep) {
   const [f, setF] = useState({ s: 1, rot: false });
   useLayoutEffect(() => {
     const hesap = () => {

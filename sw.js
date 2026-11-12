@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.2.8-2";
+const VERSION = "dyb-1.2.9-1";
 
 const SHELL = [
   "./",
@@ -35,6 +35,9 @@ const SHELL = [
   "./js/okey/okey.js",
   "./js/okey/kural.js",
   "./js/okey/ses.js",
+  "./js/okey/pisti.js",
+  "./js/okey/bilgi.js",
+  "./js/okey/kelime.js",
   "./snd/okey/cek.mp3", "./snd/okey/at.mp3", "./snd/okey/diz.mp3", "./snd/okey/sira.mp3", "./snd/okey/sure.mp3",
   "./snd/okey/karis.mp3", "./snd/okey/kazan.mp3", "./snd/okey/okey.mp3", "./snd/okey/bitti.mp3", "./snd/okey/hata.mp3",
   "./css/okey.css",
