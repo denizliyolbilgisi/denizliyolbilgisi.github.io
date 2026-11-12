@@ -100,6 +100,13 @@ export function YouTubePlayer({ youtubeId, autoplay, onReady, onViewed, onError 
 }
 
 // ---------- Ana sayfa kartı ----------
+/** 1.1.2.8: ☰ menü için: video var mı, yeni mi */
+export function useVideoMenu() {
+  const s = useVideoSummary();
+  if (!s || (!s.count && !s.can_manage)) return null;
+  return { count: s.count || 0, isNew: (s.latest_id || 0) > (store.get(seenKey(), 0) || 0), title: s.latest_title };
+}
+
 export function VideoHomeCard() {
   const s = useVideoSummary();
   if (!s || (!s.count && !s.can_manage)) return null;

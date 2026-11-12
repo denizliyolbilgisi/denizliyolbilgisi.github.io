@@ -2,13 +2,13 @@
 import { html, useState, useEffect, useRef, navigate, agoText, remainingText, isStillActive, roleRank, toast, store, can } from "../lib.js";
 import * as api from "../api.js";
 import { Modal, useInterval, useOnResume, useLive } from "../ui.js";
-import { DENIZLI, FETCH_RADIUS_M } from "../config.js";
+import { DENIZLI, FETCH_RADIUS_M, APP_VERSION } from "../config.js";
 import { enablePush, pushConfigured, pushSupported, permission } from "../push.js";
 import { RankUpModal } from "./profile.js";
 import { WallLayer, useWall, NONE, refresh as refreshWall } from "../wall.js";
 import { refreshVoiceSettings } from "./voice.js";
-import { VideoHomeCard, refreshVideos } from "./videos.js";
-import { OkeyHomeCard } from "./okey.js";
+import { useVideoMenu, refreshVideos } from "./videos.js";
+
 
 const ROOM_COLORS = {
   trafik: ["#FFB020", "#E07B00"],
@@ -45,6 +45,51 @@ function Tile({ icon, label, color, count, onClick }) {
     </button>`;
 }
 
+/** 1.1.2.8: ☰ sol üst menü (Eğitici Videolar, Oyun Salonu) */
+function SolMenu({ me, video, onClose }) {
+  useEffect(() => {
+    const esc = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+  const git = (yol) => { onClose(); navigate(yol); };
+  return html`
+    <div class="drawer-perde" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <aside class="drawer" role="dialog" aria-label="Menü">
+        <div class="drawer-bas">
+          <div class="badge home-logo">DYB</div>
+          <div class="grow" style="min-width:0">
+            <div class="drawer-ad">Denizli Yol Bilgisi</div>
+            ${me?.username && html`<div class="drawer-alt">@${me.username}</div>`}
+          </div>
+          <button class="drawer-x" aria-label="Kapat" onClick=${onClose}>✕</button>
+        </div>
+        <div class="drawer-baslik">KEŞFET</div>
+        ${video && html`
+          <button class="drawer-item" onClick=${() => git("/videolar")}>
+            <span class="di-ic" style="background:linear-gradient(135deg,#E11D48,#9F1239)">🎬</span>
+            <span class="grow" style="min-width:0">
+              <span class="di-t">Eğitici Videolar ${video.isNew && html`<b class="di-yeni">YENİ</b>`}</span>
+              <span class="di-d">${video.count ? `${video.count} video • kategorilere göre` : "Henüz video yok"}</span>
+            </span>
+            <span class="di-c">›</span>
+          </button>`}
+        ${can("okey_oyna") && html`
+          <button class="drawer-item" onClick=${() => git("/okey")}>
+            <span class="di-ic" style="background:linear-gradient(135deg,#16A34A,#14533A)">🎴</span>
+            <span class="grow" style="min-width:0">
+              <span class="di-t">Oyun Salonu <b class="di-beta">BETA</b></span>
+              <span class="di-d">Okey • 3 masa</span>
+            </span>
+            <span class="di-c">›</span>
+          </button>`}
+        ${!video && !can("okey_oyna") && html`<div class="drawer-bos">Yakında yeni bölümler burada olacak.</div>`}
+        <div class="grow"></div>
+        <div class="drawer-alt-bilgi">DYB • iPhone ${APP_VERSION}</div>
+      </aside>
+    </div>`;
+}
+
 export function MenuScreen({ onBanned }) {
   const wall = useWall();   // 🎨 1.1.2.4
   // Son görülen ana ekran telefonda saklı: açılışta her şey tek seferde gelir
@@ -52,6 +97,8 @@ export function MenuScreen({ onBanned }) {
   const [disk] = useState(() => store.get(cacheKey, null));
   const saveDisk = (part) => store.set(cacheKey, { ...(store.get(cacheKey, null) || {}), ...part });
   const [me, setMe] = useState(null);
+  const [drawer, setDrawer] = useState(false);     // 1.1.2.8: ☰ sol menü
+  const videoMenu = useVideoMenu();
   const [rooms, setRooms] = useState(() => (!api.hasRealRooms() && disk?.rooms?.length ? disk.rooms : api.cachedRooms()));
   const [roomsReady, setRoomsReady] = useState(() => api.hasRealRooms() || !!disk?.rooms?.length);   // false: iskelet kutular
   const [roomsLoaded, setRoomsLoaded] = useState(false);
@@ -206,6 +253,9 @@ export function MenuScreen({ onBanned }) {
     <div class=${"screen gradient" + (wall.id !== NONE ? " has-wall" : "")}>
       <${WallLayer} />
       <div class="home-head">
+        <button class="home-burger" aria-label="Menü" onClick=${() => setDrawer(true)}>
+          <span></span><span></span><span></span>${videoMenu?.isNew && html`<i class="hb-dot"></i>`}
+        </button>
         <div class="badge home-logo">DYB</div>
         <div class="grow" style="min-width:0">
           <div class="home-title">Denizli Yol Bilgisi</div>
@@ -258,8 +308,6 @@ export function MenuScreen({ onBanned }) {
         })}
       </div>
 
-      <${VideoHomeCard} />
-      <${OkeyHomeCard} />
 
       ${muted && html`
         <div class="card" style="margin:14px 16px 0;background:var(--red-box);border-color:#FF6B6B">
@@ -270,6 +318,7 @@ export function MenuScreen({ onBanned }) {
 
       <div style="flex:1"></div>
       <div style="height:84px"></div>
+      ${drawer && html`<${SolMenu} me=${me || disk} video=${videoMenu} onClose=${() => setDrawer(false)} />`}
       <nav class="bottom-nav">
         <button class="on"><span class="i">🏠</span>Ana Sayfa</button>
         <button onClick=${() => navigate("/mesajlar")}><span class="i">✉️</span>Mesajlar

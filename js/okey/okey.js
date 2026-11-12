@@ -99,11 +99,58 @@ export function OkeyApp({ rpc, onExit, setOrientation }) {
 }
 
 // ---------------------------------------------------------------------------
+// Sohbet (Beta) — sunucuda kapalıysa yalnız bilgi gösterilir, yazılamaz
+// ---------------------------------------------------------------------------
+const HAZIR = ["İyi oyunlar 👋", "Tebrikler 👏", "Hadi 😄", "Bol şans 🍀", "Çok iyiydi!"];
+function SohbetGovde({ acik, mesajlar, yazabilir, yazamazNeden, gonder, mesgul }) {
+  const [metin, setMetin] = useState("");
+  const liste = useRef(null);
+  useEffect(() => { if (liste.current) liste.current.scrollTop = liste.current.scrollHeight; }, [mesajlar && mesajlar.length]);
+  if (!acik) {
+    return html`<div class="ok-sh-kapali">
+      <div class="ok-sh-ikon">💬</div>
+      <b>Sohbet şimdilik kapalı</b>
+      <span>Oyun Salonu deneme (Beta) aşamasında. Sohbet yakında açılacak.</span>
+      <div class="ok-sh-hazir">${HAZIR.map((h) => html`<button key=${h} disabled>${h}</button>`)}</div>
+    </div>`;
+  }
+  const yolla = async (m) => { const t = (m || "").trim(); if (!t || mesgul) return; if (await gonder(t)) setMetin(""); };
+  return html`<div class="ok-sh-acik">
+    <div class="ok-sh-liste" ref=${liste}>
+      ${!(mesajlar || []).length && html`<div class="ok-sh-bos">Henüz mesaj yok.</div>`}
+      ${(mesajlar || []).map((x) => html`<div key=${x.id} class=${"ok-sh-msj" + (x.benim ? " benim" : "")}><b>${x.ad}</b> ${x.metin}</div>`)}
+    </div>
+    ${yazabilir ? html`
+      <div class="ok-sh-hazir">${HAZIR.map((h) => html`<button key=${h} disabled=${mesgul} onClick=${() => yolla(h)}>${h}</button>`)}</div>
+      <form class="ok-sh-yaz" onSubmit=${(e) => { e.preventDefault(); yolla(metin); }}>
+        <input maxlength="120" placeholder="Mesaj yaz…" value=${metin} onInput=${(e) => setMetin(e.target.value)} />
+        <button type="submit" disabled=${mesgul || !metin.trim()}>Gönder</button>
+      </form>` : html`<div class="ok-sh-bos">${yazamazNeden}</div>`}
+  </div>`;
+}
+
+function SalonSohbet({ rpc, salon, onYaz, goster }) {
+  const [mesgul, setMesgul] = useState(false);
+  const gonder = async (t) => {
+    setMesgul(true);
+    try { await rpc("okey_sohbet_yaz", { p_masa: null, p_metin: t }); await onYaz(); setMesgul(false); return true; }
+    catch (e) { goster(hataMetni(e), 3500); setMesgul(false); return false; }
+  };
+  return html`<div class="ok-salon-sohbet">
+    <div class="ok-sh-bas">💬 Salon sohbeti <span class="ok-beta">BETA</span></div>
+    <${SohbetGovde} acik=${!!salon.sohbet_acik} mesajlar=${salon.sohbet} yazabilir=${true} gonder=${gonder} mesgul=${mesgul} />
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // Salon (masa listesi)
 // ---------------------------------------------------------------------------
 let otoGiris = true;   // yeniden bağlanma: sayfa ilk açıldığında bir kez
 function Salon({ rpc, onExit, onMasa }) {
   const [liste, setListe] = useState(null);
+  const [salon, setSalon] = useState({});        // 1.1: masa_ac, sohbet_acik, sohbet
+  const [alinma, setAlinma] = useState(Date.now());
+  const [, saniye] = useState(0);
   const [ist, setIst] = useState(null);
   const [hata, setHata] = useState(null);
   const [mesgul, setMesgul] = useState(false);
@@ -111,8 +158,10 @@ function Salon({ rpc, onExit, onMasa }) {
 
   async function yukle() {
     try {
-      const l = (await rpc("okey_masalar_listesi")) || [];
-      setListe(l); setHata(null);
+      const r = await rpc("okey_masalar_listesi");
+      const veri = Array.isArray(r) ? { masalar: r } : (r || {});   // eski sunucu dizi döner
+      const l = veri.masalar || [];
+      setListe(l); setSalon(veri); setAlinma(Date.now()); setHata(null);
       // yeniden bağlanma: oyunu süren masam varsa doğrudan oraya
       if (otoGiris) {
         otoGiris = false;
@@ -124,8 +173,9 @@ function Salon({ rpc, onExit, onMasa }) {
   useEffect(() => {
     yukle();
     rpc("okey_istatistigim").then(setIst).catch(() => {});
-    const t = setInterval(() => { if (!document.hidden) yukle(); }, 5000);
-    return () => clearInterval(t);
+    const t = setInterval(() => { if (!document.hidden) yukle(); }, 10000);
+    const s = setInterval(() => saniye((x) => x + 1), 1000);   // geri sayım
+    return () => { clearInterval(t); clearInterval(s); };
   }, []);
 
   async function islem(fn) {
@@ -140,12 +190,15 @@ function Salon({ rpc, onExit, onMasa }) {
     const l = liste || [];
     const benim = l.find((m) => m.benim);
     if (benim) { onMasa(benim.id); return; }
-    const bos = l.find((m) => m.durum === "bekliyor" && (m.koltuklar || []).length < 4)
-      || l.find((m) => m.durum !== "bekliyor" && (m.koltuklar || []).some((k) => k.bot));
+    // önce oyuncu bekleyen masa (en kalabalık), sonra boş masa, sonra botun yerine
+    const bekleyen = l.filter((m) => m.durum === "bekliyor" && (m.koltuklar || []).length < 4)
+      .sort((a, b) => (b.koltuklar || []).length - (a.koltuklar || []).length);
+    const bos = bekleyen[0] || l.find((m) => m.durum !== "bekliyor" && (m.koltuklar || []).some((k) => k.bot));
     if (bos) { await rpc("okey_katil", { p_masa: bos.id }); onMasa(bos.id); return; }
-    const id = await rpc("okey_masa_kur", { p_ad: null });
-    onMasa(id);
+    if (salon.masa_ac) { const id = await rpc("okey_masa_kur", { p_ad: null }); onMasa(id); return; }
+    goster("Tüm masalar dolu. Bir masayı izleyebilir ya da biraz sonra tekrar deneyebilirsin.", 4500);
   });
+  const gecen = (Date.now() - alinma) / 1000;
 
   const insan = (liste || []).reduce((s, m) => s + (m.koltuklar || []).filter((k) => !k.bot).length, 0);
   return html`
@@ -155,8 +208,8 @@ function Salon({ rpc, onExit, onMasa }) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18 9 12l6-6"></path></svg>
         </button>
         <div style="flex:1;min-width:0">
-          <div class="ok-sbaslik">Okey Salonu</div>
-          <div class="ok-salt">${liste ? `${insan} oyuncu • ${liste.length} masa` : "Yükleniyor…"}</div>
+          <div class="ok-sbaslik">Oyun Salonu <span class="ok-beta">BETA</span></div>
+          <div class="ok-salt">${liste ? `🎴 Okey • ${insan} oyuncu • ${liste.length} masa` : "Yükleniyor…"}</div>
         </div>
       </div>
 
@@ -168,7 +221,7 @@ function Salon({ rpc, onExit, onMasa }) {
         </div>
         <div style="flex:1;text-align:left">
           <div class="ok-hb">Hızlı oyna</div>
-          <div class="ok-hd">Boş bir masaya otur, eksik yerlere bot oturur</div>
+          <div class="ok-hd">Uygun masaya otur; 4 kişi olunca ya da 1 dk içinde başlar</div>
         </div>
         <span class="ok-oynat"><svg width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></span>
       </button>
@@ -183,12 +236,14 @@ function Salon({ rpc, onExit, onMasa }) {
       <div class="ok-masalar">
         ${!liste && !hata && html`<div class="ok-bos">Yükleniyor…</div>`}
         ${hata && html`<div class="ok-bos">${hata}<br /><button class="ok-kbtn" style="margin-top:10px" onClick=${yukle}>Tekrar dene</button></div>`}
-        ${liste && !liste.length && html`<div class="ok-bos">Şu an açık masa yok. İlk masayı sen aç!</div>`}
+        ${liste && !liste.length && html`<div class="ok-bos">Şu an açık masa yok.</div>`}
         ${(liste || []).map((m) => {
           const ks = m.koltuklar || [];
           const bosYer = 4 - ks.length, bot = ks.filter((k) => k.bot).length;
+          const bekle = m.bekleme_sn != null ? Math.max(0, Math.ceil(m.bekleme_sn - gecen)) : null;
           const [etiket, ebg, efg] = m.durum === "bekliyor"
-            ? [bosYer ? `${bosYer} yer boş` : "Başlamayı bekliyor", "rgba(34,197,94,0.18)", "#86EFAC"]
+            ? (!ks.length ? ["Boş • otur, oyun başlasın", "rgba(34,197,94,0.18)", "#86EFAC"]
+              : [`${bekle != null ? `Başlıyor ${bekle} sn • ` : ""}${bosYer} yer boş`, "rgba(250,204,21,0.16)", "#FDE68A"])
             : m.durum === "bitti" ? [`El ${m.el_no} bitti`, "rgba(250,204,21,0.16)", "#FDE68A"]
             : [`Oynanıyor • El ${m.el_no}`, "rgba(148,163,184,0.18)", "#CBD5E1"];
           const yerVar = m.durum === "bekliyor" ? bosYer > 0 : bot > 0;
@@ -216,11 +271,14 @@ function Salon({ rpc, onExit, onMasa }) {
       </div>
 
       <div class="ok-alt">
-        <button class="ok-masaac" disabled=${mesgul} onClick=${kur}>＋ Masa aç</button>
+        ${salon.masa_ac && html`<button class="ok-masaac" disabled=${mesgul} onClick=${kur}>＋ Masa aç</button>`}
         <button class="ok-yenile" disabled=${mesgul} onClick=${yukle}>↻ Yenile</button>
       </div>
+
+      <${SalonSohbet} rpc=${rpc} salon=${salon} onYaz=${yukle} goster=${goster} />
+
       <div style="flex:1"></div>
-      <div class="ok-not">Oyun sadece eğlence içindir; para, çip ya da DYB puanı yoktur. Araç kullanırken oynama.</div>
+      <div class="ok-not">🧪 Oyun Salonu deneme (Beta) aşamasındadır. Oyun sadece eğlence içindir; para, çip ya da DYB puanı yoktur. Araç kullanırken oynama.</div>
       <${Bildirim} metin=${toast} />
     </div>`;
 }
@@ -265,7 +323,11 @@ function Masa({ rpc, masaId, onLobi }) {
   const [mesgul, setMesgul] = useState(false);
   const [kalkSor, setKalkSor] = useState(false);
   const [bittiGizle, setBittiGizle] = useState(false);
+  const [sohbetAcik, setSohbetAcik] = useState(false);
+  const [okunan, setOkunan] = useState(0);
   const [toast, goster] = useToast();
+  const dRef = useRef(null);
+  const sayac = useRef(0);
   const dis = useRef(null), sahne = useRef(null);
   const fit = useSigdir(dis, !!d);
   const istek = useRef(false);
@@ -277,12 +339,22 @@ function Masa({ rpc, masaId, onLobi }) {
 
   const anahtar = d ? `okey_dizi_${masaId}_${d.el_no}` : null;
 
-  async function getir() {
+  async function getir(tam = false) {
     if (istek.current) return;
     istek.current = true;
     try {
-      const x = await rpc("okey_durum", { p_masa: masaId });
-      setD(x); setAlinma(Date.now()); setHata(null);
+      // 1.1: değişiklik yoksa sunucu kısa cevap verir (yeni sunucu "sabit" alanını gönderir); her 10. istek tam
+      const onceki = dRef.current;
+      sayac.current++;
+      const kisa = !tam && onceki && "sabit" in onceki && sayac.current % 10 !== 0;
+      const x = await rpc("okey_durum", kisa ? { p_masa: masaId, p_surum: onceki.surum } : { p_masa: masaId });
+      if (x && x.ayni) {
+        const yeniD = { ...onceki, kalan_sn: x.kalan_sn, bekleme_sn: x.bekleme_sn };
+        dRef.current = yeniD; setD(yeniD);
+      } else {
+        dRef.current = x; setD(x);
+      }
+      setAlinma(Date.now()); setHata(null);
       if (x.durum === "kapandi") { goster("Masa kapandı."); setTimeout(onLobi, 1200); }
     } catch (e) {
       const m = hataMetni(e, "Masaya bağlanılamadı.");
@@ -292,12 +364,20 @@ function Masa({ rpc, masaId, onLobi }) {
     istek.current = false;
   }
   useEffect(() => {
-    getir();
-    const t = setInterval(() => { if (!document.hidden) getir(); }, 1000);
+    let dur = false, zaman = 0;
+    // sıra bendeyken ya da masa başlamayı beklerken 1 sn, diğer zamanlarda 2 sn
+    const dongu = async () => {
+      if (dur) return;
+      if (!document.hidden) await getir();
+      const x = dRef.current;
+      const hizli = !x || x.durum === "bekliyor" || (x.durum === "oynaniyor" && x.benim_koltuk != null && x.sira === x.benim_koltuk);
+      zaman = setTimeout(dongu, hizli ? 1000 : 2000);
+    };
+    dongu();
     const s = setInterval(() => tik((x) => x + 1), 250);
-    const gor = () => { if (!document.hidden) getir(); };
+    const gor = () => { if (!document.hidden) getir(true); };
     document.addEventListener("visibilitychange", gor);
-    return () => { clearInterval(t); clearInterval(s); document.removeEventListener("visibilitychange", gor); };
+    return () => { dur = true; clearTimeout(zaman); clearInterval(s); document.removeEventListener("visibilitychange", gor); };
   }, [masaId]);
 
   // Istakayı sunucudaki elle eşitle (yerleşim telefonda saklanır)
@@ -344,21 +424,21 @@ function Masa({ rpc, masaId, onLobi }) {
       await rpc("okey_hamle", { p_masa: masaId, p_hamle: h, p_tas: tas });
       setSecili(null);
       istek.current = false;
-      await getir();
+      await getir(true);
     } catch (e) { goster(hataMetni(e), 3800); }
     setMesgul(false);
   }
   async function cagir(ad, arg, sonra) {
     if (mesgul) return;
     setMesgul(true);
-    try { await rpc(ad, arg); if (sonra) sonra(); istek.current = false; await getir(); } catch (e) { goster(hataMetni(e), 3800); }
+    try { await rpc(ad, arg); if (sonra) sonra(); istek.current = false; await getir(true); } catch (e) { goster(hataMetni(e), 3800); }
     setMesgul(false);
   }
 
   if (!d) {
     return html`<div class="ok-masa-dis" ref=${dis}><div class="ok-yukleniyor">${hata || "Masaya bağlanılıyor…"}
       ${hata && html`<div style="margin-top:14px;display:flex;gap:10px;justify-content:center">
-        <button class="ok-kbtn" onClick=${getir}>Tekrar dene</button><button class="ok-kbtn gri" onClick=${onLobi}>Salona dön</button></div>`}</div></div>`;
+        <button class="ok-kbtn" onClick=${() => getir(true)}>Tekrar dene</button><button class="ok-kbtn gri" onClick=${onLobi}>Salona dön</button></div>`}</div></div>`;
   }
 
   const ben = d.benim_koltuk;
@@ -375,6 +455,15 @@ function Masa({ rpc, masaId, onLobi }) {
   const siradaki = (d.koltuklar || []).find((k) => k.koltuk === d.sira);
   const cevrim = (d.koltuklar || []).filter((k) => !k.bot && k.cevrimici).length;
   const botYeri = (d.koltuklar || []).some((k) => k.bot);
+
+  // ---------- Sohbet ----------
+  const mesajlar = d.sohbet || [];
+  const sonMsj = mesajlar.length ? mesajlar[mesajlar.length - 1].id : 0;
+  const okunmamis = sohbetAcik ? 0 : mesajlar.filter((x) => x.id > okunan && !x.benim).length;
+  const sohbetGonder = async (t) => {
+    try { await rpc("okey_sohbet_yaz", { p_masa: masaId, p_metin: t }); istek.current = false; await getir(true); return true; }
+    catch (e) { goster(hataMetni(e), 3500); return false; }
+  };
 
   // ---------- Istaka: dokun / sürükle ----------
   function sahneNoktasi(cx, cy) {
@@ -481,6 +570,9 @@ function Masa({ rpc, masaId, onLobi }) {
           ${d.el_no > 0 && html`<div class="ok-cel">El ${d.el_no}</div>`}
           <div style="flex:1"></div>
           <div class="ok-cevrim"><span></span>${cevrim} oyuncu çevrimiçi</div>
+          <button class="ok-csohbet" aria-label="Masa sohbeti" onClick=${() => { setSohbetAcik(!sohbetAcik); setOkunan(sonMsj); }}>
+            💬${okunmamis > 0 && html`<i>${okunmamis}</i>`}
+          </button>
           ${oturuyor
             ? html`<button class="ok-ckalk" onClick=${() => setKalkSor(true)}>Kalk</button>`
             : d.durum !== "bekliyor" && botYeri && html`<button class="ok-ckalk yesil" onClick=${() => cagir("okey_katil", { p_masa: masaId })}>Otur</button>`}
@@ -577,19 +669,27 @@ function Masa({ rpc, masaId, onLobi }) {
         ${suruk && html`<${Tas} t=${suruk.t} okR=${d.okey_r} okN=${d.okey_n} cls="hayalet" style=${`left:${suruk.x - 20}px;top:${suruk.y - 30}px`} />`}
 
         ${d.durum === "bekliyor" && html`<${Bekleme} d=${d} mesgul=${mesgul}
+          kalanBekleme=${d.bekleme_sn != null ? Math.max(0, Math.ceil(d.bekleme_sn - (Date.now() - alinma) / 1000)) : null}
           onBaslat=${() => cagir("okey_baslat", { p_masa: masaId })}
           onOtur=${() => cagir("okey_katil", { p_masa: masaId })} onLobi=${onLobi} />`}
         ${d.durum === "bitti" && !bittiGizle && html`<${Bitti} d=${d} mesgul=${mesgul}
           onYeni=${() => cagir("okey_baslat", { p_masa: masaId })} onLobi=${onLobi} onGizle=${() => setBittiGizle(true)} />`}
         ${d.durum === "bitti" && bittiGizle && html`<button class="ok-sonuc" onClick=${() => setBittiGizle(false)}>🏁 El sonucu</button>`}
 
+        ${sohbetAcik && html`
+          <div class="ok-sh-panel">
+            <div class="ok-sh-bas">💬 Masa sohbeti <span class="ok-beta">BETA</span>
+              <button aria-label="Kapat" onClick=${() => { setSohbetAcik(false); setOkunan(sonMsj); }}>✕</button></div>
+            <${SohbetGovde} acik=${!!d.sohbet_acik} mesajlar=${mesajlar} yazabilir=${oturuyor}
+              yazamazNeden="Masayı izliyorsun; yalnız oturanlar yazabilir." gonder=${sohbetGonder} mesgul=${mesgul} />
+          </div>`}
         ${kalkSor && html`
           <${Pencere} baslik="Masadan kalkılsın mı?" onClose=${() => setKalkSor(false)}
             butonlar=${html`
               <button class="ok-kbtn gri" onClick=${() => setKalkSor(false)}>Vazgeç</button>
-              ${d.kuran_benim && html`<button class="ok-kbtn kirmizi" onClick=${() => { setKalkSor(false); cagir("okey_kapat", { p_masa: masaId }, onLobi); }}>Masayı kapat</button>`}
+              ${d.kuran_benim && !d.sabit && html`<button class="ok-kbtn kirmizi" onClick=${() => { setKalkSor(false); cagir("okey_kapat", { p_masa: masaId }, onLobi); }}>Masayı kapat</button>`}
               <button class="ok-kbtn" onClick=${() => { setKalkSor(false); cagir("okey_ayril", { p_masa: masaId }, onLobi); }}>Kalk</button>`}>
-            <p>${d.durum === "oynaniyor" ? "Oyun sürüyor: kalkarsan yerine bot oturur. Puanın bu masada kalır." : "Masadaki yerin boşalır."}</p>
+            <p>${d.durum === "oynaniyor" ? "Oyun sürüyor: kalkarsan yerine bot oturur." : "Masadaki yerin boşalır."}</p>
           </${Pencere}>`}
         <${Bildirim} metin=${toast} />
       </div>
@@ -599,14 +699,16 @@ function Masa({ rpc, masaId, onLobi }) {
 // ---------------------------------------------------------------------------
 // Bekleme (masa kuruldu, oyun başlamadı)
 // ---------------------------------------------------------------------------
-function Bekleme({ d, mesgul, onBaslat, onOtur, onLobi }) {
+function Bekleme({ d, mesgul, onBaslat, onOtur, onLobi, kalanBekleme }) {
   const ks = d.koltuklar || [];
   const oturuyor = d.benim_koltuk != null;
   return html`
     <div class="ok-kaplama">
       <div class="ok-kutu">
         <div class="ok-kbas">🎴 ${d.ad}</div>
-        <div class="ok-kalt">4 kişilik masa • boş yerlere bot oturur • hamle süresi ${d.hamle_sn || 30} sn</div>
+        <div class="ok-kalt">${kalanBekleme != null
+          ? html`4 kişi olunca hemen başlar • <b class="ok-sayac">${kalanBekleme} sn</b> sonra boş yerlere bot oturup başlar`
+          : `4 kişilik masa • hamle süresi ${d.hamle_sn || 30} sn • boş yerlere bot oturur`}</div>
         <div class="ok-bkolt">
           ${[0, 1, 2, 3].map((i) => {
             const k = ks.find((x) => x.koltuk === i);
@@ -619,8 +721,8 @@ function Bekleme({ d, mesgul, onBaslat, onOtur, onLobi }) {
         <div class="ok-pbtn" style="justify-content:center">
           ${!oturuyor && ks.length < 4 && html`<button class="ok-kbtn yesil" disabled=${mesgul} onClick=${onOtur}>Otur</button>`}
           ${d.kuran_benim
-            ? html`<button class="ok-kbtn yesil buyuk" disabled=${mesgul} onClick=${onBaslat}>▶ Oyunu başlat</button>`
-            : oturuyor && html`<div class="ok-bekle">Masayı kuranın başlatması bekleniyor…</div>`}
+            ? html`<button class="ok-kbtn yesil buyuk" disabled=${mesgul} onClick=${onBaslat}>▶ Hemen başlat</button>`
+            : oturuyor && html`<div class="ok-bekle">${d.masa_basi ? `Masa başı ${d.masa_basi} • ` : ""}diğer oyuncular bekleniyor…</div>`}
           <button class="ok-kbtn gri" onClick=${onLobi}>Salona dön</button>
         </div>
       </div>
