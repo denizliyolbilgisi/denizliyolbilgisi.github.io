@@ -226,7 +226,6 @@ export function VoiceBubble({ path, sec, expired }) {
         </div>
       </div>
       ${me && player.error && html`<div class="vb-time">${player.error}</div>`}
-      <div class="vb-keep">⏳ ${s.keep_days || 3} gün sonra silinir</div>
     </div>`;
 }
 

@@ -331,3 +331,140 @@
 .pk-skor-s { background: #172231; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .pk-skor-s.kazanan { background: rgba(250,204,21,.12); border: 1px solid rgba(250,204,21,.5); }
 .pk-skor-s span { font-size: 12px; color: #A7B8C9; } .pk-skor-s em { font-style: normal; font-size: 22px; font-weight: 800; color: #4ADE80; font-family: Rubik, Inter, system-ui, sans-serif; } .pk-skor-s small { color: #A7B8C9; }
+
+/* =====================================================================
+   Oyun Salonları giriş ekranı (kartlar)
+   ===================================================================== */
+.os-salon { background: radial-gradient(ellipse at 50% -10%, #17365C 0%, #0D1726 52%, #090F1A 100%); }
+.os-liste { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; }
+.os-izgara { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.os-kart { position: relative; display: flex; flex-direction: column; justify-content: flex-end; text-align: left; height: 188px; padding: 14px; box-sizing: border-box;
+  border-radius: 22px; border: 1px solid rgba(255,255,255,0.08); color: #fff; overflow: hidden; isolation: isolate;
+  background: linear-gradient(160deg, #18243A 0%, #101828 100%);
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--vurgu) 38%, transparent) 0%, transparent 62%),
+    linear-gradient(160deg, #18243A 0%, #101828 100%);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: transform .12s ease, box-shadow .12s ease; }
+.os-kart:active { transform: scale(0.975); }
+.os-kart::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--vurgu); opacity: .85; }
+.os-cizim { position: absolute; right: 0; top: 8px; width: 112px; height: 84px; z-index: -1; filter: drop-shadow(0 8px 14px rgba(0,0,0,0.35)); }
+.os-cizim svg { width: 100%; height: 100%; display: block; }
+.os-yazi { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.os-yazi b { font-size: 18px; font-weight: 800; letter-spacing: -0.2px; line-height: 1.15; }
+.os-izgara .os-yazi b { font-size: 17px; white-space: nowrap; }
+.os-izgara .os-alt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.os-izgara .os-canli { max-width: calc(100% - 40px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+.os-izgara .os-kart { height: 176px; }
+.os-alt { font-size: 12.5px; color: #B6C3D4; font-weight: 600; }
+.os-canli { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; align-self: flex-start; font-size: 11.5px; font-weight: 700; color: #C7D2DE;
+  background: rgba(255,255,255,0.08); border-radius: 999px; padding: 3px 9px 3px 7px; }
+.os-canli i { width: 7px; height: 7px; border-radius: 50%; background: #64748B; }
+.os-canli.aktif { color: #BBF7D0; background: rgba(34,197,94,0.14); }
+.os-canli.aktif i { background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,0.25); animation: os-nabiz 1.6s ease-in-out infinite; }
+@keyframes os-nabiz { 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+.os-ok { position: absolute; right: 12px; bottom: 14px; width: 30px; height: 30px; border-radius: 10px; background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center; color: #E2E8F0; }
+.os-yeni, .os-yakinda { align-self: flex-start; font-size: 10px; font-weight: 900; letter-spacing: .6px; border-radius: 6px; padding: 2px 7px; margin-bottom: 4px; }
+.os-yeni { background: #22C55E; color: #052E16; }
+.os-yakinda { background: rgba(255,255,255,0.12); color: #CBD5E1; }
+.os-kart.genis { height: 168px; }
+.os-kart.genis .os-cizim { width: 200px; height: 142px; right: -10px; top: 12px; }
+.os-kart.genis .os-ok { display: none; }
+.os-kart.genis .os-yazi { max-width: 58%; }
+.os-kart.genis .os-yazi b { font-size: 24px; }
+.os-kart.yakinda { height: 92px; flex-direction: row; align-items: center; justify-content: flex-start; filter: grayscale(.6); opacity: .62; cursor: default; }
+.os-kart.yakinda::after { display: none; }
+.os-kart.yakinda .os-cizim { width: 104px; height: 78px; top: 7px; }
+.os-durum { margin-left: auto; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 9px; background: rgba(148,163,184,0.16); color: #CBD5E1; }
+.os-durum.acik { background: rgba(34,197,94,0.16); color: #86EFAC; }
+@media (max-width: 360px) { .os-kart, .os-izgara .os-kart { height: 168px; } .os-izgara .os-yazi b { font-size: 15px; } .os-cizim { width: 96px; height: 72px; } .os-yazi b { font-size: 16px; } }
+
+/* =====================================================================
+   🎱 Bilardo — salon
+   ===================================================================== */
+.bl-hizli { background: linear-gradient(135deg, #166534, #0B3D22); }
+.bl-masalar { display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
+.bl-kart { background: #121B2B; border: 1px solid #1E2A3E; border-radius: 20px; padding: 12px; }
+.bl-kbas { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.bl-kbas b { font-size: 16px; font-weight: 800; }
+.bl-et { margin-left: auto; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 9px; }
+.bl-et.bos { background: rgba(34,197,94,0.15); color: #86EFAC; }
+.bl-et.bekl { background: rgba(250,204,21,0.15); color: #FDE68A; }
+.bl-et.oyun { background: rgba(148,163,184,0.16); color: #CBD5E1; }
+.bl-mini { display: block; border-radius: 10px; }
+.bl-kalt { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.bl-oy { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bl-oy span { font-size: 12.5px; font-weight: 700; color: #C7D2DE; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 92px; }
+.bl-oy span.soluk { color: #6B7C93; }
+.bl-oy em { font-style: normal; font-size: 11px; font-weight: 800; color: #FACC15; }
+.bl-vs { font-size: 11px; font-weight: 900; color: #6B7C93; }
+.bl-btn { margin-left: auto; min-width: 70px; height: 38px; border: 0; border-radius: 12px; color: #fff; font-size: 14px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; padding: 0 14px; box-sizing: border-box; }
+.bl-btn.yesil { background: #16A34A; } .bl-btn.mavi { background: #1F6FEB; } .bl-btn.gri { background: #334155; }
+.bl-antrenman { margin: 12px 16px 0; width: calc(100% - 32px) !important; max-width: 528px !important; display: flex; align-items: center; gap: 12px; text-align: left; color: #fff;
+  background: #121B2B; border: 1px dashed #2E3D55; border-radius: 18px; padding: 12px 14px; }
+.bl-antrenman b { display: block; font-size: 15px; font-weight: 800; }
+.bl-antrenman span { font-size: 12.5px; color: #9FB0C3; font-weight: 600; }
+.bl-antrenman .bl-btn { color: #fff; font-size: 14px; }
+.bl-kural { margin: 14px 16px 0; width: calc(100% - 32px) !important; max-width: 528px !important; background: #111A28; border-radius: 16px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: #9FB0C3; line-height: 1.45; }
+.bl-kural b { color: #E2E8F0; font-size: 13.5px; }
+
+/* =====================================================================
+   🎱 Bilardo — masa (844×390 sahne)
+   ===================================================================== */
+.bl-masa { background: radial-gradient(ellipse at 50% 45%, #1B2A3A 0%, #0F1822 60%, #070B10 100%); }
+.bl-tuval { position: absolute; left: 0; top: 0; width: 844px; height: 390px; touch-action: none; }
+.bl-cubuk { background: rgba(0,0,0,0.45); gap: 8px; }
+.bl-cubuk .ok-cad { max-width: 150px; font-size: 14px; }
+.bl-ono { font-size: 11px; font-weight: 600; color: #9FB0C3; }
+.bl-oyuncular { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+.bl-oyuncu { display: flex; align-items: center; gap: 7px; background: rgba(255,255,255,0.06); border-radius: 999px; padding: 2px 12px 2px 2px; height: 34px; box-sizing: border-box; min-width: 0; max-width: 230px; }
+.bl-oyuncu.sag { flex-direction: row-reverse; padding: 2px 2px 2px 12px; text-align: right; }
+.bl-oyuncu.aktif { background: rgba(250,204,21,0.16); box-shadow: 0 0 0 1.5px rgba(250,204,21,0.7); }
+.bl-oyuncu.bos { color: #6B7C93; font-size: 12px; font-weight: 700; padding: 0 14px; }
+.bl-oyuncu .ok-halka { transform: scale(.82); margin: -6px; }
+.bl-obilgi { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
+.bl-obilgi b { font-size: 12px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-obilgi b em { font-style: normal; color: #FACC15; }
+.bl-obilgi span { font-size: 10.5px; color: #9FB0C3; font-weight: 600; }
+.bl-kalan { display: block; margin-top: 2px; }
+.bl-oyuncu.sag .bl-kalan { margin-left: auto; }
+.bl-ant-say { font-size: 12.5px; color: #C7D2DE; font-weight: 600; }
+.bl-ant-say b { color: #FACC15; }
+.bl-guc { position: absolute; left: 22px; top: 74px; width: 54px; height: 250px; touch-action: none; display: flex; flex-direction: column; align-items: center; }
+.bl-guc-ic { position: relative; width: 26px; height: 220px; border-radius: 13px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.18); overflow: hidden; }
+.bl-guc-ic i { position: absolute; left: 3px; right: 3px; top: 3px; max-height: calc(100% - 6px); border-radius: 10px; background: linear-gradient(180deg, #22C55E, #FACC15 55%, #EF4444); }
+.bl-guc-ok { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.55); animation: bl-asagi 1.4s ease-in-out infinite; }
+@keyframes bl-asagi { 50% { transform: translateY(-14px); opacity: .35; } }
+.bl-guc-yazi { margin-top: 6px; font-size: 10px; font-weight: 800; color: #9FB0C3; letter-spacing: .4px; }
+.bl-guc.kapali, .bl-teker.kapali, .bl-efekt.kapali { opacity: .35; }
+.bl-guc.kapali .bl-guc-ok { display: none; }
+.bl-teker { position: absolute; right: 30px; top: 70px; width: 40px; height: 170px; border-radius: 12px; overflow: hidden; touch-action: none;
+  background: linear-gradient(90deg, #1E293B, #475569 50%, #1E293B); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
+.bl-teker-cizgi { position: absolute; inset: 0; background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0.28) 0 2px, transparent 2px 12px); }
+.bl-teker-yazi, .bl-efekt-yazi { position: absolute; right: 14px; width: 72px; text-align: center; font-size: 9.5px; font-weight: 800; color: #9FB0C3; letter-spacing: .3px; }
+.bl-teker-yazi { top: 246px; }
+.bl-efekt { position: absolute; right: 24px; top: 272px; width: 52px; height: 52px; border-radius: 50%; border: 0; padding: 0;
+  background: radial-gradient(circle at 35% 30%, #FFFFFF, #E8E8E2 60%, #BDBDB5); box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+.bl-efekt i, .bl-efekt-buyuk i { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #DC2626; box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
+.bl-efekt-yazi { top: 330px; }
+.bl-efekt-kutu { width: 360px; text-align: center; }
+.bl-efekt-buyuk { position: relative; width: 120px; height: 120px; margin: 12px auto 4px; border-radius: 50%; touch-action: none;
+  background: radial-gradient(circle at 35% 30%, #FFFFFF, #E8E8E2 60%, #BDBDB5); box-shadow: 0 6px 16px rgba(0,0,0,0.5); }
+.bl-efekt-buyuk::before, .bl-efekt-buyuk::after { content: ""; position: absolute; background: rgba(0,0,0,0.12); }
+.bl-efekt-buyuk::before { left: 50%; top: 8px; bottom: 8px; width: 1px; }
+.bl-efekt-buyuk::after { top: 50%; left: 8px; right: 8px; height: 1px; }
+.bl-efekt-buyuk i { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.bl-durum { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); z-index: 5; pointer-events: none; white-space: nowrap; max-width: 560px; overflow: hidden; text-overflow: ellipsis;
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.14); color: #E2E8F0; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; }
+.bl-durum.sende { background: rgba(250,204,21,0.16); border-color: rgba(250,204,21,0.55); color: #FDE68A; }
+.bl-durum.olay { background: rgba(15,23,42,0.82); border-color: rgba(147,197,253,0.5); color: #DBEAFE; }
+.bl-bitti { width: 380px; text-align: center; }
+.bl-kupa { font-size: 40px; line-height: 1; }
+.bl-skor { display: flex; justify-content: center; gap: 12px; margin: 10px 0 4px; }
+.bl-skor > div { display: flex; align-items: center; gap: 6px; background: #172231; border-radius: 999px; padding: 3px 12px 3px 3px; }
+.bl-skor > div.kazanan { box-shadow: 0 0 0 1.5px #FACC15; }
+.bl-skor b { font-size: 12.5px; }
+.bl-skor em { font-style: normal; font-weight: 900; color: #FACC15; font-size: 15px; }
+.ok-cubuk .ok-sh-panel { position: fixed; }

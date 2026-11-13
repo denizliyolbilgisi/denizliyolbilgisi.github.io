@@ -2,6 +2,7 @@
 import { html, useState, useEffect, useRef } from "../../vendor/preact-htm.js";
 import { hataMetni, useToast, Bildirim, Avatar, Pencere, useSigdir, avRenk, harf } from "./okey.js";
 import { cal, sesAcikMi, sesAyarla } from "./ses.js";
+import { MasaSohbet } from "./sohbet.js";
 
 const RENK = ["♠", "♥", "♦", "♣"];
 const SAYI = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -190,6 +191,7 @@ export function PistiMasa({ rpc, masaId, onLobi }) {
           ${d.el_no > 0 && html`<div class="ok-cel">El ${d.el_no}</div>`}
           <div style="flex:1"></div>
           <button class="ok-cses" aria-label=${sesOn ? "Sesi kapat" : "Sesi aç"} onClick=${() => { const y = !sesOn; setSesOn(y); sesAyarla(y); }}>${sesOn ? "🔊" : "🔇"}</button>
+          <${MasaSohbet} rpc=${rpc} oyun="pisti" masaId=${masaId} oturuyor=${oturuyor} goster=${goster} />
           ${oturuyor ? html`<button class="ok-ckalk" onClick=${() => setKalkSor(true)}>Kalk</button>`
             : d.durum !== "bekliyor" && (d.koltuklar || []).some((k) => k.bot) && html`<button class="ok-ckalk yesil" onClick=${() => cagir("pisti_katil", { p_masa: masaId })}>Otur</button>`}
         </div>

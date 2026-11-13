@@ -1,6 +1,6 @@
 // 1.1.2.8+ 🔊 Okey sesleri (Kenney ses paketleri, CC0 — telifsiz). iPhone ve Android aynı dosyayı kullanır.
 // Web Audio ile çalınır (gecikmesiz). Telefonlar sesi ilk dokunuştan sonra açar; ilk dokunuşta kilit açılır.
-const ADLAR = ["cek", "at", "diz", "sira", "sure", "karis", "kazan", "okey", "bitti", "hata"];
+const ADLAR = ["cek", "at", "diz", "sira", "sure", "karis", "kazan", "okey", "bitti", "hata", "b_top", "b_istaka", "b_bant", "b_cep"];
 const KOK = new URL("../../snd/okey/", import.meta.url).href;
 let ctx = null;
 const tampon = {};

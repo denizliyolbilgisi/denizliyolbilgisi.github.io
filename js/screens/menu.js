@@ -76,10 +76,10 @@ function SolMenu({ me, video, onClose }) {
           </button>`}
         ${can("okey_oyna") && html`
           <button class="drawer-item" onClick=${() => git("/okey")}>
-            <span class="di-ic" style="background:linear-gradient(135deg,#16A34A,#14533A)">🎴</span>
+            <span class="di-ic" style="background:linear-gradient(135deg,#16A34A,#14533A)">🎱</span>
             <span class="grow" style="min-width:0">
-              <span class="di-t">Oyun Salonu <b class="di-beta">BETA</b></span>
-              <span class="di-d">Okey • Pişti • Yarışma • Kelime</span>
+              <span class="di-t">Oyun Salonları <b class="di-beta">BETA</b></span>
+              <span class="di-d">Bilardo • Okey • Pişti • Yarışma • Kelime</span>
             </span>
             <span class="di-c">›</span>
           </button>`}

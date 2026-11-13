@@ -9,8 +9,10 @@ import { cal, sesAcikMi, sesAyarla } from "./ses.js";
 import { PistiSalon, PistiMasa } from "./pisti.js";
 import { BilgiEkrani } from "./bilgi.js";
 import { KelimeEkrani } from "./kelime.js";
+import { SohbetGovde } from "./sohbet.js";
+import { BilardoSalon, BilardoMasa } from "./bilardo.js";
+import { OyunSalonlari, OYUNLAR } from "./salonlar.js";
 
-const SEKMELER = [["okey", "🎴", "Okey"], ["pisti", "🃏", "Pişti"], ["bilgi", "🚦", "Yarışma"], ["kelime", "🔤", "Kelime"]];
 
 const W = 844, H = 390;
 const AV = ["#2563EB", "#7C3AED", "#0D9488", "#DB2777", "#EA580C", "#16A34A", "#0891B2", "#B45309"];
@@ -92,73 +94,46 @@ export function useToast() {
 // ---------------------------------------------------------------------------
 export function OkeyApp({ rpc, onExit, setOrientation }) {
   const [masa, setMasa] = useState(() => ls.get("okey_acik_masa", null));
-  const [pMasa, setPMasa] = useState(() => ls.get("pisti_acik_masa", null));     // 2.0: Pişti masası
-  const [sekme, setSekmeS] = useState(() => ls.get("oyun_sekme", "okey"));
-  const setSekme = (x) => { setSekmeS(x); ls.set("oyun_sekme", x); };
+  const [pMasa, setPMasa] = useState(() => ls.get("pisti_acik_masa", null));     // Pişti masası
+  const [bMasa, setBMasa] = useState(() => ls.get("bilardo_acik_masa", null));   // Bilardo masası
+  const [antrenman, setAntrenman] = useState(false);
+  const kayitliMasa = useRef(!!(masa || pMasa || bMasa));   // telefonda açık masa vardı → giriş ekranı tekrar yönlendirmesin
+  // Oyun Salonları: giriş ekranı (null) → oyunun salonu → masa
+  const [sekme, setSekme] = useState(() => (ls.get("okey_acik_masa", null) ? "okey" : ls.get("pisti_acik_masa", null) ? "pisti"
+    : ls.get("bilardo_acik_masa", null) ? "bilardo" : null));
   useEffect(() => { if (masa) ls.set("okey_acik_masa", masa); else ls.del("okey_acik_masa"); }, [masa]);
   useEffect(() => { if (pMasa) ls.set("pisti_acik_masa", pMasa); else ls.del("pisti_acik_masa"); }, [pMasa]);
-  useEffect(() => { setOrientation?.(masa || pMasa ? "landscape" : "portrait"); }, [masa, pMasa]);
-  // Android geri tuşu: masadaysa salona dön (true = işlendi)
+  useEffect(() => { if (bMasa) ls.set("bilardo_acik_masa", bMasa); else ls.del("bilardo_acik_masa"); }, [bMasa]);
+  const yatay = !!(masa || pMasa || bMasa || antrenman);
+  useEffect(() => { setOrientation?.(yatay ? "landscape" : "portrait"); }, [yatay]);
+  // Android geri tuşu: masa → salon → Oyun Salonları → çıkış (true = işlendi)
   useEffect(() => {
-    window.dybBack = () => { if (masa) { setMasa(null); return true; } if (pMasa) { setPMasa(null); return true; } return false; };
+    window.dybBack = () => {
+      if (masa) { setMasa(null); return true; }
+      if (pMasa) { setPMasa(null); return true; }
+      if (bMasa) { setBMasa(null); return true; }
+      if (antrenman) { setAntrenman(false); return true; }
+      if (sekme) { setSekme(null); return true; }
+      return false;
+    };
     return () => { window.dybBack = null; };
-  }, [masa, pMasa]);
-  return html`<div class="okey-kok">${masa
-    ? html`<${Masa} key=${masa} rpc=${rpc} masaId=${masa} onLobi=${() => setMasa(null)} />`
-    : pMasa ? html`<${PistiMasa} key=${pMasa} rpc=${rpc} masaId=${pMasa} onLobi=${() => setPMasa(null)} />`
-    : html`<${Salon} rpc=${rpc} onExit=${onExit} onMasa=${setMasa} onPisti=${(id) => { setSekme("pisti"); setPMasa(id); }}
-        sekme=${sekme} setSekme=${setSekme} />`}</div>`;
-}
-
-// ---------------------------------------------------------------------------
-// Sohbet (Beta) — sunucuda kapalıysa yalnız bilgi gösterilir, yazılamaz
-// ---------------------------------------------------------------------------
-const HAZIR = ["İyi oyunlar 👋", "Tebrikler 👏", "Hadi 😄", "Bol şans 🍀", "Çok iyiydi!"];
-function SohbetGovde({ acik, mesajlar, yazabilir, yazamazNeden, gonder, mesgul }) {
-  const [metin, setMetin] = useState("");
-  const liste = useRef(null);
-  useEffect(() => { if (liste.current) liste.current.scrollTop = liste.current.scrollHeight; }, [mesajlar && mesajlar.length]);
-  if (!acik) {
-    return html`<div class="ok-sh-kapali">
-      <div class="ok-sh-ikon">💬</div>
-      <b>Sohbet şimdilik kapalı</b>
-      <span>Oyun Salonu deneme (Beta) aşamasında. Sohbet yakında açılacak.</span>
-      <div class="ok-sh-hazir">${HAZIR.map((h) => html`<button key=${h} disabled>${h}</button>`)}</div>
-    </div>`;
-  }
-  const yolla = async (m) => { const t = (m || "").trim(); if (!t || mesgul) return; if (await gonder(t)) setMetin(""); };
-  return html`<div class="ok-sh-acik">
-    <div class="ok-sh-liste" ref=${liste}>
-      ${!(mesajlar || []).length && html`<div class="ok-sh-bos">Henüz mesaj yok.</div>`}
-      ${(mesajlar || []).map((x) => html`<div key=${x.id} class=${"ok-sh-msj" + (x.benim ? " benim" : "")}><b>${x.ad}</b> ${x.metin}</div>`)}
-    </div>
-    ${yazabilir ? html`
-      <div class="ok-sh-hazir">${HAZIR.map((h) => html`<button key=${h} disabled=${mesgul} onClick=${() => yolla(h)}>${h}</button>`)}</div>
-      <form class="ok-sh-yaz" onSubmit=${(e) => { e.preventDefault(); yolla(metin); }}>
-        <input maxlength="120" placeholder="Mesaj yaz…" value=${metin} onInput=${(e) => setMetin(e.target.value)} />
-        <button type="submit" disabled=${mesgul || !metin.trim()}>Gönder</button>
-      </form>` : html`<div class="ok-sh-bos">${yazamazNeden}</div>`}
-  </div>`;
-}
-
-function SalonSohbet({ rpc, salon, onYaz, goster }) {
-  const [mesgul, setMesgul] = useState(false);
-  const gonder = async (t) => {
-    setMesgul(true);
-    try { await rpc("okey_sohbet_yaz", { p_masa: null, p_metin: t }); await onYaz(); setMesgul(false); return true; }
-    catch (e) { goster(hataMetni(e), 3500); setMesgul(false); return false; }
-  };
-  return html`<div class="ok-salon-sohbet">
-    <div class="ok-sh-bas">💬 Salon sohbeti <span class="ok-beta">BETA</span></div>
-    <${SohbetGovde} acik=${!!salon.sohbet_acik} mesajlar=${salon.sohbet} yazabilir=${true} gonder=${gonder} mesgul=${mesgul} />
-  </div>`;
+  }, [masa, pMasa, bMasa, antrenman, sekme]);
+  let icerik;
+  if (masa) icerik = html`<${Masa} key=${masa} rpc=${rpc} masaId=${masa} onLobi=${() => setMasa(null)} />`;
+  else if (pMasa) icerik = html`<${PistiMasa} key=${pMasa} rpc=${rpc} masaId=${pMasa} onLobi=${() => setPMasa(null)} />`;
+  else if (bMasa) icerik = html`<${BilardoMasa} key=${bMasa} rpc=${rpc} masaId=${bMasa} onLobi=${() => setBMasa(null)} />`;
+  else if (antrenman) icerik = html`<${BilardoMasa} key="antrenman" rpc=${rpc} antrenman=${true} onLobi=${() => setAntrenman(false)} />`;
+  else if (sekme) icerik = html`<${Salon} key=${sekme} rpc=${rpc} sekme=${sekme} onHub=${() => setSekme(null)} onMasa=${setMasa}
+      onPisti=${setPMasa} onBilardo=${setBMasa} onAntrenman=${() => setAntrenman(true)} />`;
+  else icerik = html`<${OyunSalonlari} rpc=${rpc} onSec=${setSekme} onExit=${onExit} otoIzin=${!kayitliMasa.current}
+      onDevam=${(oyun, id) => { setSekme(oyun); if (oyun === "okey") setMasa(id); else if (oyun === "pisti") setPMasa(id); else if (oyun === "bilardo") setBMasa(id); }} />`;
+  return html`<div class="okey-kok">${icerik}</div>`;
 }
 
 // ---------------------------------------------------------------------------
 // Salon (masa listesi)
 // ---------------------------------------------------------------------------
-let otoGiris = true;   // yeniden bağlanma: sayfa ilk açıldığında bir kez
-function Salon({ rpc, onExit, onMasa, onPisti, sekme = "okey", setSekme }) {
+function Salon({ rpc, onHub, onMasa, onPisti, onBilardo, onAntrenman, sekme = "okey" }) {
   const [liste, setListe] = useState(null);
   const [salon, setSalon] = useState({});        // 1.1: masa_ac, sohbet_acik, sohbet
   const [alinma, setAlinma] = useState(Date.now());
@@ -174,15 +149,11 @@ function Salon({ rpc, onExit, onMasa, onPisti, sekme = "okey", setSekme }) {
       const veri = Array.isArray(r) ? { masalar: r } : (r || {});   // eski sunucu dizi döner
       const l = veri.masalar || [];
       setListe(l); setSalon(veri); setAlinma(Date.now()); setHata(null);
-      // yeniden bağlanma: oyunu süren masam varsa doğrudan oraya
-      if (otoGiris) {
-        otoGiris = false;
-        const benim = l.find((m) => m.benim && m.durum === "oynaniyor");
-        if (benim) { onMasa(benim.id); return; }
-      }
+      // yeniden bağlanma artık Oyun Salonları giriş ekranında (oyun_salonu_ozet.benim)
     } catch (e) { setHata(hataMetni(e, "Masalar yüklenemedi.")); }
   }
   useEffect(() => {
+    if (sekme !== "okey") return;
     yukle();
     rpc("okey_istatistigim").then(setIst).catch(() => {});
     const t = setInterval(() => { if (!document.hidden) yukle(); }, 10000);
@@ -216,18 +187,15 @@ function Salon({ rpc, onExit, onMasa, onPisti, sekme = "okey", setSekme }) {
   return html`
     <div class="ok-salon">
       <div class="ok-sbas">
-        <button class="ok-geri" aria-label="Geri" onClick=${onExit}>
+        <button class="ok-geri" aria-label="Oyun Salonları" onClick=${onHub}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18 9 12l6-6"></path></svg>
         </button>
         <div style="flex:1;min-width:0">
-          <div class="ok-sbaslik">Oyun Salonu <span class="ok-beta">BETA</span></div>
-          <div class="ok-salt">Okey • Pişti • Yarışma • Kelime</div>
+          <div class="ok-sbaslik">${OYUNLAR[sekme]?.ad || "Oyun"} <span class="ok-beta">BETA</span></div>
+          <div class="ok-salt">Oyun Salonları • ${OYUNLAR[sekme]?.alt || ""}</div>
         </div>
       </div>
-      <div class="ok-sekmeler" role="tablist">
-        ${SEKMELER.map(([k, i, ad]) => html`<button key=${k} role="tab" aria-selected=${sekme === k} class=${sekme === k ? "on" : ""}
-          onClick=${() => setSekme && setSekme(k)}><span>${i}</span>${ad}</button>`)}
-      </div>
+      ${sekme === "bilardo" && html`<${BilardoSalon} rpc=${rpc} onMasa=${onBilardo} onAntrenman=${onAntrenman} />`}
       ${sekme === "pisti" && html`<${PistiSalon} rpc=${rpc} onMasa=${onPisti} />`}
       ${sekme === "bilgi" && html`<${BilgiEkrani} rpc=${rpc} />`}
       ${sekme === "kelime" && html`<${KelimeEkrani} rpc=${rpc} />`}
@@ -295,11 +263,10 @@ function Salon({ rpc, onExit, onMasa, onPisti, sekme = "okey", setSekme }) {
         <button class="ok-yenile" disabled=${mesgul} onClick=${yukle}>↻ Yenile</button>
       </div>
 
-      <${SalonSohbet} rpc=${rpc} salon=${salon} onYaz=${yukle} goster=${goster} />
       `}
 
       <div style="flex:1"></div>
-      <div class="ok-not">🧪 Oyun Salonu deneme (Beta) aşamasındadır. Oyun sadece eğlence içindir; para, çip ya da DYB puanı yoktur. Araç kullanırken oynama.</div>
+      <div class="ok-not">🧪 Oyun Salonları deneme (Beta) aşamasındadır. Oyun sadece eğlence içindir; para, çip ya da DYB puanı yoktur. Araç kullanırken oynama.</div>
       <${Bildirim} metin=${toast} />
     </div>`;
 }
