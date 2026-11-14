@@ -3,6 +3,8 @@
 import { html, useState, useEffect, useRef } from "../../vendor/preact-htm.js";
 import { hataMetni, useToast, Bildirim, Avatar, Pencere, useSigdir, avRenk, harf } from "./okey.js";
 import { cal, sesAcikMi, sesAyarla } from "./ses.js";
+import { siraTakip, SiraSende } from "./sira.js";
+import { useIslemMenu } from "./yonetim.js";
 import { MasaSohbet } from "./sohbet.js";
 import { simule, ucgen, botAtis, nisanIzi, koyulabilir, konumSinirla, grubu, R, MW, MH, BAS_CIZGI } from "./bilardo-fizik.js";
 
@@ -231,7 +233,8 @@ export function BilardoMasa({ rpc, masaId, onLobi, antrenman = false }) {
   const [toast, goster] = useToast();
   const dis = useRef(null), sahne = useRef(null), tuval = useRef(null);
   const fit = useSigdir(dis, !!d);
-  const dRef = useRef(d), istek = useRef(false), sayac = useRef(0), sonTik = useRef(null);
+  const dRef = useRef(d), istek = useRef(false), sayac = useRef(0), sonTik = useRef(null), siraRef = useRef(null);
+  const [islemAc, islemMenu] = useIslemMenu(rpc, goster);
   const goruntu = useRef(d ? d.toplar : []);           // çizilen toplar [[n,x,y]]
   const nisan = useRef([1, 0]);                         // yön vektörü
   const elde = useRef(null);                            // top eldeyken beyazın yeri [x,y] (birim)
@@ -301,7 +304,6 @@ export function BilardoMasa({ rpc, masaId, onLobi, antrenman = false }) {
     const ben = d.benim_koltuk;
     if (d.durum === "oynaniyor" && o.durum !== "oynaniyor") { cal("karis", 0.6); setBittiGizle(false); }
     if (d.durum === "bitti" && o.durum === "oynaniyor") setTimeout(() => cal(d.kazanan === ben ? "kazan" : "bitti"), 400);
-    if (ben != null && d.durum === "oynaniyor" && d.sira === ben && !(o.sira === ben && o.durum === "oynaniyor")) setTimeout(() => cal("sira", 0.7), 300);
   }, [d?.surum]);
   const olayZaman = useRef(0);
 
@@ -630,6 +632,7 @@ export function BilardoMasa({ rpc, masaId, onLobi, antrenman = false }) {
   const oran = kalan == null || antrenman ? null : Math.min(1, kalan / (d.atis_sn || 30));
   const sn = benimSiram && kalan != null && !antrenman ? Math.ceil(kalan) : null;
   if (sn != null && sn <= 5 && sn >= 1 && sonTik.current !== sn) { sonTik.current = sn; cal("sure", 0.5); }
+  const siraGoster = siraTakip(siraRef, !!benimSiram && !antrenman && d.durum === "oynaniyor", kalan);
   const bekle = d.bekleme_sn != null ? Math.max(0, Math.ceil(d.bekleme_sn - (Date.now() - alinma) / 1000)) : null;
   const masadaki = goruntu.current || [];
   const oyuncu = (koltuk) => {
@@ -639,7 +642,8 @@ export function BilardoMasa({ rpc, masaId, onLobi, antrenman = false }) {
     const kalanTop = k.grup ? masadaki.filter(([n]) => kendiMi(k.grup, n)).map(([n]) => n).sort((a, b) => a - b) : [];
     const sekizde = k.grup && !kalanTop.length;
     return html`
-      <div class=${"bl-oyuncu" + (aktif ? " aktif" : "") + (koltuk === 1 ? " sag" : "")}>
+      <div class=${"bl-oyuncu" + (aktif ? " aktif" : "") + (koltuk === 1 ? " sag" : "") + (!k.bot && koltuk !== ben ? " dokun" : "")}
+        onClick=${!k.bot && koltuk !== ben ? () => islemAc({ ad: k.ad, oyun: "bilardo", masa: masaId, koltuk }) : null}>
         ${aktif && oran != null ? html`<${Avatar} ad=${k.ad} bot=${k.bot} size=${28} halka=${oran} />` : html`<${Avatar} ad=${k.ad} bot=${k.bot} size=${28} />`}
         <div class="bl-obilgi">
           <b>${k.ad}${!k.bot && !k.cevrimici ? " • çevrimdışı" : ""}${k.skor ? html` <em>${k.skor}</em>` : ""}</b>
@@ -660,6 +664,8 @@ export function BilardoMasa({ rpc, masaId, onLobi, antrenman = false }) {
       <div class="ok-sahne" ref=${sahne} style=${`transform:${fit.rot ? "rotate(90deg) " : ""}scale(${fit.s})`}>
         <canvas class="bl-tuval" ref=${tuval} width=${SW} height=${SH}
           onPointerDown=${masaBas} onPointerMove=${masaKay} onPointerUp=${masaBirak} onPointerCancel=${masaBirak}></canvas>
+        <${SiraSende} goster=${siraGoster} sesOn=${sesOn} />
+        ${islemMenu}
 
         <div class="ok-cubuk bl-cubuk">
           <button class="ok-cgeri" aria-label="Salona dön" onClick=${onLobi}>

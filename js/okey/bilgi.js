@@ -80,7 +80,7 @@ export function BilgiEkrani({ rpc }) {
       <div class="bq-kutu">
         <div class="bq-ust">
           <span class="bq-no">Soru ${soru.no} / ${soru.adet}</span>
-          <span class="bq-kat">${soru.kategori}</span>${soru.zorluk ? `<span class="bq-zor bq-z${soru.zorluk}">${["", "Kolay", "Normal", "Zor"][soru.zorluk]}</span>` : ""}
+          <span class="bq-kat">${soru.kategori}</span>${soru.zorluk ? html`<span class=${"bq-zor bq-z" + soru.zorluk}>${["", "Kolay", "Normal", "Zor"][soru.zorluk]}</span>` : null}
           <span class="bq-puan">⭐ ${oturum.toplam || 0}</span>
         </div>
         <div class="bq-sure"><i style=${`width:${Math.max(0, oran * 100)}%;background:${oran < 0.3 ? "#EF4444" : "#FACC15"}`}></i></div>

@@ -6,6 +6,8 @@ import {
   bitirebilir, gruplara, gercekOkey,
 } from "./kural.js";
 import { cal, sesAcikMi, sesAyarla } from "./ses.js";
+import { siraTakip, SiraSende } from "./sira.js";
+import { useIslemMenu, SalonYonetimi } from "./yonetim.js";
 import { PistiSalon, PistiMasa } from "./pisti.js";
 import { BilgiEkrani } from "./bilgi.js";
 import { KelimeEkrani } from "./kelime.js";
@@ -41,8 +43,9 @@ const TUR = {
 // ---------------------------------------------------------------------------
 // Küçük parçalar
 // ---------------------------------------------------------------------------
-function Tas({ t, okR, okN, cls = "", style = "", ...rest }) {
+function Tas({ t, okR, okN, ters = false, cls = "", style = "", ...rest }) {
   if (t == null) return html`<div class=${"ok-tas bos " + cls} style=${style} ...${rest}></div>`;
+  if (ters) return html`<div class=${"ok-tas ters " + cls} style=${style} aria-label="Ters çevrilmiş okey" ...${rest}><span class="ok-arka"></span></div>`;
   if (t >= 104) {
     return html`<div class=${"ok-tas " + cls} style=${style} ...${rest}>
       <svg class="ok-yildiz" viewBox="0 0 24 24" role="img" aria-label="Sahte okey"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="#16A34A" stroke="#0F7A37" stroke-width="1"></path></svg>
@@ -123,6 +126,7 @@ export function OkeyApp({ rpc, onExit, setOrientation }) {
   else if (pMasa) icerik = html`<${PistiMasa} key=${pMasa} rpc=${rpc} masaId=${pMasa} onLobi=${() => setPMasa(null)} />`;
   else if (bMasa) icerik = html`<${BilardoMasa} key=${bMasa} rpc=${rpc} masaId=${bMasa} onLobi=${() => setBMasa(null)} />`;
   else if (antrenman) icerik = html`<${BilardoMasa} key="antrenman" rpc=${rpc} antrenman=${true} onLobi=${() => setAntrenman(false)} />`;
+  else if (sekme === "yonetim") icerik = html`<${SalonYonetimi} rpc=${rpc} onGeri=${() => setSekme(null)} />`;
   else if (sekme) icerik = html`<${Salon} key=${sekme} rpc=${rpc} sekme=${sekme} onHub=${() => setSekme(null)} onMasa=${setMasa}
       onPisti=${setPMasa} onBilardo=${setBMasa} onAntrenman=${() => setAntrenman(true)} />`;
   else icerik = html`<${OyunSalonlari} rpc=${rpc} onSec=${setSekme} onExit=${onExit} otoIzin=${!kayitliMasa.current}
@@ -319,6 +323,12 @@ function Masa({ rpc, masaId, onLobi }) {
   const [sesOn, setSesOn] = useState(sesAcikMi());
   const sonSes = useRef(null);      // önceki durum (sesler için)
   const sonTik = useRef(null);
+  const siraRef = useRef(null);
+  const [islemAc, islemMenu] = useIslemMenu(rpc, goster);
+  // 1.1.3 🂠 okeyi ters çevirme (iki kez dokun). Sadece bu telefonda görünür; son seçim sonraki ellerde de geçerli.
+  const [tersler, setTersler] = useState({});
+  const sonDokun = useRef({ t: null, an: 0 });
+  const ipucu = useRef(false);
   const dis = useRef(null), sahne = useRef(null);
   const fit = useSigdir(dis, !!d);
   const istek = useRef(false);
@@ -416,7 +426,6 @@ function Masa({ rpc, masaId, onLobi }) {
       const ok = (o.koltuklar || []).find((x) => x.koltuk === k.koltuk);
       if (ok && k.koltuk !== ben && k.atilan_sayi > ok.atilan_sayi) cal("at", 0.45);
     });
-    if (ben != null && d.sira === ben && o.sira !== ben) setTimeout(() => cal("sira", 0.8), 250);
   }, [d?.surum, d?.durum, d?.el_no]);
   // ⏱ son 5 saniye (sadece benim sıramda)
   {
@@ -424,6 +433,7 @@ function Masa({ rpc, masaId, onLobi }) {
       ? Math.ceil(Math.max(0, d.kalan_sn - (Date.now() - alinma) / 1000)) : null;
     if (sn != null && sn >= 1 && sn <= 5 && sonTik.current !== sn) { sonTik.current = sn; cal("sure", 0.5); }
     if (sn == null || sn > 5) sonTik.current = null;
+    var siraGoster = siraTakip(siraRef, sn != null, d && d.kalan_sn != null ? Math.max(0, d.kalan_sn - (Date.now() - alinma) / 1000) : null);
   }
 
   // Sıra bana geçince titreşim
@@ -496,6 +506,21 @@ function Masa({ rpc, masaId, onLobi }) {
     const z = el && el.closest("[data-drop]");
     return z ? z.getAttribute("data-drop") : null;
   }
+  // yeni elde ters/düz seçimleri sıfırlanır (taş numaraları her elde yeniden kullanılır)
+  useEffect(() => { setTersler({}); }, [d?.el_no]);
+  // ilk kez okey gelince bir kerelik ipucu
+  useEffect(() => {
+    if (ipucu.current || !d || !d.el || d.durum !== "oynaniyor") return;
+    if (!d.el.some((t) => gercekOkey(t, d.okey_r, d.okey_n))) return;
+    ipucu.current = true;
+    try {
+      if (localStorage.getItem("okey_ters_ipucu")) return;
+      localStorage.setItem("okey_ters_ipucu", "1");
+    } catch (_) { return; }
+    setTimeout(() => goster("🂠 İpucu: Okeyine iki kez dokunursan ters çevrilir.", 4200), 1500);
+  }, [d?.el_no, d?.el && d.el.length]);
+  const hepTers = (() => { try { return localStorage.getItem("okey_hep_ters") === "1"; } catch (_) { return false; } })();
+  const tersMi = (t) => (t in tersler ? tersler[t] : hepTers);
   function tasBasla(e, yer) {
     if (dizi[yer] == null || mesgul) return;
     e.preventDefault();
@@ -529,6 +554,17 @@ function Masa({ rpc, masaId, onLobi }) {
     else if (h === "bitir") { if (atAsama) hamle("bitir", t); else goster(sirabende ? "Bitirmek için önce taş çek." : "Sıra sende değil."); }
   }
   function tasDokun(yer) {
+    const t = dizi[yer], an = Date.now();
+    if (d && gercekOkey(t, d.okey_r, d.okey_n) && sonDokun.current.t === t && an - sonDokun.current.an < 380) {
+      sonDokun.current = { t: null, an: 0 };
+      const yeniDurum = !tersMi(t);
+      setTersler((x) => ({ ...x, [t]: yeniDurum }));
+      try { localStorage.setItem("okey_hep_ters", yeniDurum ? "1" : "0"); } catch (_) { /* */ }
+      setSecili(null);
+      cal("diz", 0.5);
+      return;
+    }
+    sonDokun.current = { t, an };
     if (secili === yer) { setSecili(null); return; }
     setSecili(yer);
   }
@@ -560,7 +596,9 @@ function Masa({ rpc, masaId, onLobi }) {
   const oyuncu = (k, yon) => {
     if (!k) return html`<div class="ok-oyuncu bos-k">Boş yer</div>`;
     const sirada = d.durum === "oynaniyor" && d.sira === k.koltuk;
-    return html`<div class=${"ok-oyuncu" + (sirada ? " sirada" : "")}>
+    const dokun = !k.bot && k.koltuk !== d.benim_koltuk;
+    return html`<div class=${"ok-oyuncu" + (sirada ? " sirada" : "") + (dokun ? " dokun" : "")}
+      onClick=${dokun ? () => islemAc({ ad: k.ad, oyun: "okey", masa: masaId, koltuk: k.koltuk }) : null}>
       ${sirada && oran != null ? html`<${Avatar} ad=${k.ad} bot=${k.bot} halka=${oran} />` : html`<${Avatar} ad=${k.ad} bot=${k.bot} />`}
       <div class="ok-oad">${k.ad}</div>
       <div class="ok-oalt">${d.durum === "oynaniyor" ? `${k.tas} taş • ` : ""}${k.skor} puan</div>
@@ -580,6 +618,8 @@ function Masa({ rpc, masaId, onLobi }) {
       <div class="ok-sahne" ref=${sahne}
         style=${`transform:${fit.rot ? "rotate(90deg) " : ""}scale(${fit.s})`}>
         <div class="ok-desen"></div>
+        <${SiraSende} goster=${siraGoster} sesOn=${sesOn} />
+        ${islemMenu}
 
         <!-- üst çubuk -->
         <div class="ok-cubuk">
@@ -666,7 +706,7 @@ function Masa({ rpc, masaId, onLobi }) {
                       data-drop=${"yer:" + yer} onClick=${() => yerDokun(yer)}></div>`;
                   }
                   const cls = (secili === yer ? "sec " : "") + (yeni === t ? "yeni " : "") + (suruk && suruk.yer === yer ? "kayan " : "") + (suruk && suruk.h === "yer:" + yer ? "hedef" : "");
-                  return html`<${Tas} key=${"t" + t} t=${t} okR=${d.okey_r} okN=${d.okey_n} cls=${cls} data-drop=${"yer:" + yer}
+                  return html`<${Tas} key=${"t" + t} t=${t} okR=${d.okey_r} okN=${d.okey_n} ters=${gercekOkey(t, d.okey_r, d.okey_n) && tersMi(t)} cls=${cls} data-drop=${"yer:" + yer}
                     onPointerDown=${(e) => tasBasla(e, yer)} />`;
                 })}
               </div>`)}
@@ -688,7 +728,7 @@ function Masa({ rpc, masaId, onLobi }) {
           </div>`}
 
         <!-- sürüklenen taş -->
-        ${suruk && html`<${Tas} t=${suruk.t} okR=${d.okey_r} okN=${d.okey_n} cls="hayalet" style=${`left:${suruk.x - 20}px;top:${suruk.y - 30}px`} />`}
+        ${suruk && html`<${Tas} t=${suruk.t} okR=${d.okey_r} okN=${d.okey_n} ters=${gercekOkey(suruk.t, d.okey_r, d.okey_n) && tersMi(suruk.t)} cls="hayalet" style=${`left:${suruk.x - 20}px;top:${suruk.y - 30}px`} />`}
 
         ${d.durum === "bekliyor" && html`<${Bekleme} d=${d} mesgul=${mesgul}
           kalanBekleme=${d.bekleme_sn != null ? Math.max(0, Math.ceil(d.bekleme_sn - (Date.now() - alinma) / 1000)) : null}
@@ -703,7 +743,8 @@ function Masa({ rpc, masaId, onLobi }) {
             <div class="ok-sh-bas">💬 Masa sohbeti <span class="ok-beta">BETA</span>
               <button aria-label="Kapat" onClick=${() => { setSohbetAcik(false); setOkunan(sonMsj); }}>✕</button></div>
             <${SohbetGovde} acik=${!!d.sohbet_acik} mesajlar=${mesajlar} yazabilir=${oturuyor}
-              yazamazNeden="Masayı izliyorsun; yalnız oturanlar yazabilir." gonder=${sohbetGonder} mesgul=${mesgul} />
+              yazamazNeden="Masayı izliyorsun; yalnız oturanlar yazabilir." gonder=${sohbetGonder} mesgul=${mesgul}
+              rpc=${rpc} kaynak="okey" goster=${goster} onDegisti=${() => getir(true)} />
           </div>`}
         ${kalkSor && html`
           <${Pencere} baslik="Masadan kalkılsın mı?" onClose=${() => setKalkSor(false)}

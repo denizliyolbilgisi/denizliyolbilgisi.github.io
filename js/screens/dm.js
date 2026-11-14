@@ -155,6 +155,10 @@ export function DmChatScreen({ userId }) {
   const inputRef = useRef(null);
   const caretRef = useRef(null);
   const lastIdRef = useRef(null);
+  // 1.1.3: eski mesajları okurken yeni mesaj gelirse aşağı çekilmez, "⬇ N yeni mesaj" düğmesi çıkar
+  const [yeniSay, setYeniSay] = useState(0);
+  const [altta, setAltta] = useState(true);
+  const alttaMi = () => { const el = listRef.current; return !el || el.scrollHeight - el.scrollTop - el.clientHeight < 80; };
   const lastTypingRef = useRef(0);
   const [typers, setTypers] = useState([]);
 
@@ -176,12 +180,20 @@ export function DmChatScreen({ userId }) {
     if (!id) return;
     try {
       const list = await api.dmMessages(id);
+      const oncekiAltta = alttaMi();
       setMessages(list || []);
       setLoading(false);
       const last = list && list.length ? list[list.length - 1].id : null;
       if (last !== lastIdRef.current) {
+        const onceki = lastIdRef.current;
         lastIdRef.current = last;
-        requestAnimationFrame(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; });
+        const yeni = onceki == null ? [] : (list || []).filter((m) => m.id > onceki);
+        if (onceki == null || oncekiAltta || yeni.some((m) => m.sender_id === myId)) {
+          requestAnimationFrame(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; });
+          setYeniSay(0);
+        } else {
+          setYeniSay((n) => n + yeni.filter((m) => m.sender_id !== myId).length);
+        }
       }
       api.markDmRead(id).catch(() => {});
     } catch (e) {
@@ -367,7 +379,7 @@ export function DmChatScreen({ userId }) {
         onSubClick=${() => setShowProfile(true)}
         right=${convId && html`<button class="btn ghost" style="font-size:24px;font-weight:800" onClick=${() => setShowHide(true)}>⋮</button>`} />
 
-      <div class="messages" ref=${listRef}>
+      <div class="messages" ref=${listRef} onScroll=${() => { const a = alttaMi(); setAltta(a); if (a) setYeniSay(0); }}>
         ${loading ? html`<${Spinner} />`
           : messages.length === 0 && pending.length === 0 ? html`<div class="center muted" style="flex:1">${s && !s.reason ? "Henüz mesaj yok. İlk mesajı sen yaz! 👋" : "Henüz mesaj yok."}</div>`
           : messages.map((m, i) => {
@@ -402,6 +414,11 @@ export function DmChatScreen({ userId }) {
             </div>
             ${p.failed && html`<button class="btn ghost small" onClick=${() => setPending((l) => l.filter((x) => x.id !== p.id))}>Vazgeç</button>`}
           </div>`)}
+        ${!loading && messages.length > 0 && !altta && html`
+          <button class="btn" style="position:sticky;bottom:10px;align-self:center;flex:none;border-radius:24px;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:2"
+            onClick=${() => { const el = listRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); setYeniSay(0); }}>
+            ${yeniSay > 0 ? `⬇ ${yeniSay} yeni mesaj` : "⬇ En alta in"}
+          </button>`}
       </div>
 
       ${err && html`<div class="small" style="color:var(--red-soft);padding:4px 16px">${err}</div>`}

@@ -1,6 +1,6 @@
 // DYB – arka plan görevlisi: bildirimleri gösterir ve uygulama dosyalarını saklar.
 // Yeni sürüm yüklerken aşağıdaki sürüm numarasını artırın.
-const VERSION = "dyb-1.3.1-1";
+const VERSION = "dyb-1.3.2-1";
 
 const SHELL = [
   "./",
@@ -35,11 +35,13 @@ const SHELL = [
   "./js/okey/okey.js",
   "./js/okey/kural.js",
   "./js/okey/ses.js",
+  "./js/okey/sira.js",
   "./js/okey/pisti.js",
   "./js/okey/bilgi.js",
   "./js/okey/kelime.js",
   "./js/okey/salonlar.js",
   "./js/okey/sohbet.js",
+  "./js/okey/yonetim.js",
   "./js/okey/bilardo.js",
   "./js/okey/bilardo-fizik.js",
   "./snd/okey/cek.mp3", "./snd/okey/at.mp3", "./snd/okey/diz.mp3", "./snd/okey/sira.mp3", "./snd/okey/sure.mp3",
@@ -118,6 +120,9 @@ self.addEventListener("push", (event) => {
     tag = "dm-" + (d.sender_id || "");
   } else if (type === "video") {
     url = "./#/videolar";                       // 🎬 yeni eğitici video
+  } else if (type === "oyun") {
+    url = "./#/okey";                           // 🎴 sıra sende: Oyun Salonları (masaya kendiliğinden döner)
+    tag = "oyun";
   } else if (type === "sifre") {
     url = "./#/yonetim?tab=sifre";              // şifre yenileme talebi
     tag = "sifre";

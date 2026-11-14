@@ -2,11 +2,14 @@
 // Okey masa sohbeti okey_sohbet_*, salon + Pişti + Bilardo masaları oyun_sohbet_* kullanır.
 import { html, useState, useEffect, useRef } from "../../vendor/preact-htm.js";
 import { hataMetni } from "./okey.js";
+import { useIslemMenu, rozet } from "./yonetim.js";
 
 export const HAZIR = ["İyi oyunlar 👋", "Tebrikler 👏", "Hadi 😄", "Bol şans 🍀", "Çok iyiydi!"];
 
-export function SohbetGovde({ acik, mesajlar, yazabilir, yazamazNeden, gonder, mesgul }) {
+export function SohbetGovde({ acik, mesajlar, yazabilir, yazamazNeden, gonder, mesgul, rpc, kaynak = "oyun", goster, onDegisti }) {
   const [metin, setMetin] = useState("");
+  // 1.1.3: mesaja dokun → şikayet et / (ekip) sil, sustur, uzaklaştır
+  const [islemAc, islemMenu] = useIslemMenu(rpc, (m, ms) => { goster && goster(m, ms); onDegisti && onDegisti(); });
   const liste = useRef(null);
   useEffect(() => { if (liste.current) liste.current.scrollTop = liste.current.scrollHeight; }, [mesajlar && mesajlar.length]);
   if (!acik) {
@@ -21,8 +24,10 @@ export function SohbetGovde({ acik, mesajlar, yazabilir, yazamazNeden, gonder, m
   return html`<div class="ok-sh-acik">
     <div class="ok-sh-liste" ref=${liste}>
       ${!(mesajlar || []).length && html`<div class="ok-sh-bos">Henüz mesaj yok.</div>`}
-      ${(mesajlar || []).map((x) => html`<div key=${x.id} class=${"ok-sh-msj" + (x.benim ? " benim" : "")}><b>${x.ad}</b> ${x.metin}</div>`)}
+      ${(mesajlar || []).map((x) => html`<div key=${x.id} class=${"ok-sh-msj dokun" + (x.benim ? " benim" : "")}
+          onClick=${() => rpc && islemAc({ ad: x.ad, kaynak, mesaj: x.id, metin: x.metin, benim: !!x.benim })}><b>${rozet(x.ad) && html`<span class="rz">${rozet(x.ad)}</span>`}${x.ad}</b> ${x.metin}</div>`)}
     </div>
+    ${islemMenu}
     ${yazabilir ? html`
       <div class="ok-sh-hazir">${HAZIR.map((h) => html`<button key=${h} disabled=${mesgul} onClick=${() => yolla(h)}>${h}</button>`)}</div>
       <form class="ok-sh-yaz" onSubmit=${(e) => { e.preventDefault(); yolla(metin); }}>
@@ -60,7 +65,7 @@ export function SalonSohbetKutusu({ rpc, goster }) {
   };
   return html`<div class="ok-salon-sohbet">
     <div class="ok-sh-bas">💬 Salon sohbeti <span class=${"os-durum " + (d.acik ? "acik" : "")}>${d.acik ? "Açık" : "Kapalı • Beta"}</span></div>
-    <${SohbetGovde} acik=${!!d.acik} mesajlar=${d.mesajlar} yazabilir=${true} gonder=${gonder} mesgul=${mesgul} />
+    <${SohbetGovde} acik=${!!d.acik} mesajlar=${d.mesajlar} yazabilir=${true} gonder=${gonder} mesgul=${mesgul} rpc=${rpc} goster=${goster} onDegisti=${al} />
   </div>`;
 }
 
@@ -85,6 +90,6 @@ export function MasaSohbet({ rpc, oyun, masaId, oturuyor, goster }) {
         <div class="ok-sh-bas">💬 Masa sohbeti <span class="ok-beta">BETA</span>
           <button aria-label="Kapat" onClick=${() => { setAcikPanel(false); setOkunan(son); }}>✕</button></div>
         <${SohbetGovde} acik=${!!d.acik} mesajlar=${mesajlar} yazabilir=${oturuyor}
-          yazamazNeden="Masayı izliyorsun; yalnız oturanlar yazabilir." gonder=${gonder} mesgul=${mesgul} />
+          yazamazNeden="Masayı izliyorsun; yalnız oturanlar yazabilir." gonder=${gonder} mesgul=${mesgul} rpc=${rpc} goster=${goster} onDegisti=${al} />
       </div>`}`;
 }

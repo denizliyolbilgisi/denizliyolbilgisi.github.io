@@ -2,6 +2,8 @@
 import { html, useState, useEffect, useRef } from "../../vendor/preact-htm.js";
 import { hataMetni, useToast, Bildirim, Avatar, Pencere, useSigdir, avRenk, harf } from "./okey.js";
 import { cal, sesAcikMi, sesAyarla } from "./ses.js";
+import { siraTakip, SiraSende } from "./sira.js";
+import { useIslemMenu } from "./yonetim.js";
 import { MasaSohbet } from "./sohbet.js";
 
 const RENK = ["♠", "♥", "♦", "♣"];
@@ -101,7 +103,8 @@ export function PistiMasa({ rpc, masaId, onLobi }) {
   const [toast, goster] = useToast();
   const dis = useRef(null);
   const fit = useSigdir(dis, !!d);
-  const dRef = useRef(null), istek = useRef(false), sayac = useRef(0), onceki = useRef(null), sonTik = useRef(null);
+  const dRef = useRef(null), istek = useRef(false), sayac = useRef(0), onceki = useRef(null), sonTik = useRef(null), siraRef = useRef(null);
+  const [islemAc, islemMenu] = useIslemMenu(rpc, goster);
 
   async function getir(tam = false) {
     if (istek.current) return;
@@ -144,7 +147,6 @@ export function PistiMasa({ rpc, masaId, onLobi }) {
     if (d.son_kart != null && d.son_kart !== o.son_kart && o.sira !== ben) {
       if (/PİŞTİ/.test(d.son_olay || "")) cal("okey", 0.7); else cal(/yeri aldı/.test(d.son_olay || "") ? "cek" : "at", 0.5);
     }
-    if (ben != null && d.durum === "oynaniyor" && d.sira === ben && o.sira !== ben) setTimeout(() => cal("sira", 0.8), 250);
   }, [d?.surum, d?.durum]);
 
   async function oyna(c) {
@@ -177,11 +179,14 @@ export function PistiMasa({ rpc, masaId, onLobi }) {
   const oran = kalan == null ? null : Math.min(1, kalan / (d.hamle_sn || 20));
   const sn = sirada && kalan != null ? Math.ceil(kalan) : null;
   if (sn != null && sn <= 5 && sn >= 1 && sonTik.current !== sn) { sonTik.current = sn; cal("sure", 0.5); }
+  const siraGoster = siraTakip(siraRef, sirada, kalan);
   const bekle = d.bekleme_sn != null ? Math.max(0, Math.ceil(d.bekleme_sn - (Date.now() - alinma) / 1000)) : null;
 
   return html`
     <div class="ok-masa-dis pk-masa" ref=${dis}>
       <div class="ok-sahne" style=${`transform:${fit.rot ? "rotate(90deg) " : ""}scale(${fit.s})`}>
+        <${SiraSende} goster=${siraGoster} sesOn=${sesOn} />
+        ${islemMenu}
         <div class="ok-cubuk">
           <button class="ok-cgeri" aria-label="Salona dön" onClick=${onLobi}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18 9 12l6-6"></path></svg>
@@ -198,7 +203,8 @@ export function PistiMasa({ rpc, masaId, onLobi }) {
 
         <!-- rakip -->
         ${rakip && html`
-          <div class="pk-rakip">
+          <div class=${"pk-rakip" + (!rakip.bot && oturuyor ? " dokun" : "")}
+            onClick=${!rakip.bot && oturuyor ? () => islemAc({ ad: rakip.ad, oyun: "pisti", masa: masaId, koltuk: rakip.koltuk }) : null}>
             ${d.durum === "oynaniyor" && d.sira === rakip.koltuk && oran != null ? html`<${Avatar} ad=${rakip.ad} bot=${rakip.bot} size=${34} halka=${oran} />` : html`<${Avatar} ad=${rakip.ad} bot=${rakip.bot} size=${34} />`}
             <div><div class="ok-oad">${rakip.ad}${!rakip.bot && !rakip.cevrimici ? " • çevrimdışı" : ""}</div><div class="ok-oalt">${rakip.alinan} kart aldı${rakip.pisti ? ` • ${rakip.pisti} pişti puanı` : ""} • toplam ${rakip.skor}</div></div>
             <div class="pk-rakip-el">${Array.from({ length: rakip.kart }, (_, i) => html`<${Kart} key=${i} ters kucuk />`)}</div>
